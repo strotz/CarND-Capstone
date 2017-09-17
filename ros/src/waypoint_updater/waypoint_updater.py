@@ -36,17 +36,25 @@ class WaypointUpdater(object):
 
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
-        # TODO: Add other member variables you need below
+        self.current_position = None
+        self.closest_wp = 0
 
         rospy.spin()
 
     def pose_cb(self, msg):
-        # TODO: Implement
-        pass
+        self.current_position = msg.pose.position
 
     def waypoints_cb(self, waypoints):
-        # TODO: Implement
-        pass
+        map_wp = waypoints.waypoints
+        # find closest waypoint
+        if self.current_position:
+            self.closest_wp = self.closest_waypoint(self.current_position.x, self.current_position.y, map_wp[self.closest_wp:])
+        # publish data
+        lane = Lane()
+        lane.header.frame_id = waypoints.header.frame_id
+        lane.header.stamp = rospy.get_rostime()
+        lane.waypoints = map_wp[self.closest_wp:self.closest_wp+LOOKAHEAD_WPS]
+        self.final_waypoints_pub.publish(lane)
 
     def traffic_cb(self, msg):
         # TODO: Callback for /traffic_waypoint message. Implement
@@ -69,6 +77,23 @@ class WaypointUpdater(object):
             dist += dl(waypoints[wp1].pose.pose.position, waypoints[i].pose.pose.position)
             wp1 = i
         return dist
+
+    def distance_sqrt(self, x1, y1, x2, y2):
+        return math.sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1))
+
+    def closest_waypoint(self, x, y, waypoints):
+        closest_len = 100000
+        closest_wp = 0;
+
+        for (i, wp) in enumerate(waypoints):
+            map_x = wp.pose.pose.position.x
+            map_y = wp.pose.pose.position.y
+            dist = self.distance_sqrt(x, y, map_x, map_y)
+            if dist < closest_len:
+                closet_len = dist
+                closest_wp = i
+
+        return closest_wp
 
 
 if __name__ == '__main__':

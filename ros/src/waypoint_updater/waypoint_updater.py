@@ -28,7 +28,7 @@ LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this n
 
 class WaypointUpdater(object):
     def __init__(self):
-        rospy.init_node('waypoint_updater')
+        rospy.init_node('waypoint_updater', log_level=rospy.DEBUG)
 
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
@@ -48,6 +48,7 @@ class WaypointUpdater(object):
             self.prepare_and_publish(self.latest_pose, self.latest_waypoints)
 
     def waypoints_cb(self, lane):
+        rospy.logdebug("total base waypoints %s", len(lane.waypoints))
         self.latest_waypoints = lane.waypoints
 
     def traffic_cb(self, msg):
@@ -66,13 +67,20 @@ class WaypointUpdater(object):
             rospy.logwarn('no waypoints found ahead of car')
             return
   
-        rospy.logdebug("next waypoint is %s, total base waypoints %s", closest_wp, len(waypoints))
+        rospy.logdebug("next waypoint is %s", closest_wp)
+
+        tail = len(waypoints) - closest_wp
+        send = waypoints[ closest_wp : closest_wp + min(LOOKAHEAD_WPS, tail) ]
+        if tail < LOOKAHEAD_WPS:
+            send.append(waypoints[ 0 : (LOOKAHEAD_WPS - tail)])
+
+        rospy.logdebug("lenght of waypoints to send is %s", len(send))
 
         # publish data
         lane = Lane()
         lane.header.frame_id = '/world'
         lane.header.stamp = rospy.Time.now()
-        lane.waypoints = waypoints[closest_wp : closest_wp + LOOKAHEAD_WPS] # TODO: implement ring buffer
+        lane.waypoints = send
         self.final_waypoints_pub.publish(lane)
         
     def find_next_waypoint(self, pose, waypoints):

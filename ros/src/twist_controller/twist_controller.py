@@ -23,8 +23,7 @@ class Controller(object):
         proposed_linear_velocity = args[0]
         proposed_angular_velocity = args[1]
         current_linear_velocity = args[2]
-        dbw_status = args[3]
-
+   
         throttle = self.pid_velocity.step(proposed_linear_velocity - current_linear_velocity, 0.02)
 
         return throttle, 0., 0.

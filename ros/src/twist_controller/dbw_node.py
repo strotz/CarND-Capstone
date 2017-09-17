@@ -33,7 +33,7 @@ that we have created in the `__init__` function.
 
 class DBWNode(object):
     def __init__(self):
-        rospy.init_node('dbw_node')
+        rospy.init_node('dbw_node', log_level=rospy.DEBUG)
 
         vehicle_mass = rospy.get_param('~vehicle_mass', 1736.35)
         fuel_capacity = rospy.get_param('~fuel_capacity', 13.5)
@@ -55,13 +55,13 @@ class DBWNode(object):
 
         self.controller = Controller(vehicle_mass, fuel_capacity, brake_deadband, decel_limit, accel_limit, wheel_radius, wheel_base, steer_ratio, max_lat_accel, max_steer_angle)
 
+        self.twist_cmd = None
+        self.dbw_enabled = None
+        self.current_velocity = None
+
         rospy.Subscriber('/twist_cmd', TwistStamped, self.twist_cmd_cb)
         rospy.Subscriber('/vehicle/dbw_enabled', Bool, self.dbw_enabled_cb)
         rospy.Subscriber('/current_velocity', TwistStamped, self.current_velocity_cb)
-
-        self.twist_cmd = None
-        self.dbw_enabled = False
-        self.current_velocity = None
 
         self.loop()
 
@@ -76,18 +76,33 @@ class DBWNode(object):
 
     def loop(self):
         rate = rospy.Rate(50) # 50Hz
+
         while not rospy.is_shutdown():
-            if (self.twist_cmd is not None) and (self.current_velocity is not None):
-                if self.dbw_enabled:
-                    proposed_linear_velocity = self.twist_cmd.twist.linear.x
-                    proposed_angular_velocity = self.twist_cmd.twist.angular.z
-                    current_linear_velocity = self.current_velocity.twist.linear.x
-                    throttle, brake, steer = self.controller.control(proposed_linear_velocity, proposed_angular_velocity, current_linear_velocity, self.dbw_enabled)
+            # to avoid sync issues (some fields can be updated by callbacks) work with local variables
+            twist_cmd = self.twist_cmd
+            current_velocity = self.current_velocity
+            dbw_enabled = self.dbw_enabled
+
+            if (twist_cmd is not None) and (current_velocity is not None):
+                if dbw_enabled is None:
+                    rospy.loginfo('dbw_enabled is not initialized')
+                elif dbw_enabled:
+                    proposed_linear_velocity = twist_cmd.twist.linear.x
+                    proposed_angular_velocity = twist_cmd.twist.angular.z
+                    current_linear_velocity = current_velocity.twist.linear.x
+
+                    throttle, brake, steer = self.controller.control(proposed_linear_velocity, proposed_angular_velocity, current_linear_velocity)
+                    rospy.logdebug("calculated throttle: %s, brake: %s, steer: %s", throttle, brake, steer)
+
                     self.publish(throttle, brake, steer)
                 else:
                     self.controller.reset()
+
             rate.sleep()
 
+    # Note that throttle values passed to publish should be in the range 0 to 1. 
+    # Brake values passed to publish should be in units of torque (N*m). 
+    # The correct values for brake can be computed using the desired acceleration, weight of the vehicle, and wheel radius.
     def publish(self, throttle, brake, steer):
         tcmd = ThrottleCmd()
         tcmd.enable = True
@@ -100,12 +115,13 @@ class DBWNode(object):
         scmd.steering_wheel_angle_cmd = steer
         self.steer_pub.publish(scmd)
 
-        bcmd = BrakeCmd()
-        bcmd.enable = True
-        bcmd.pedal_cmd_type = BrakeCmd.CMD_TORQUE
-        bcmd.pedal_cmd = brake
-        self.brake_pub.publish(bcmd)
-
+        # do not send brake command unless required
+        if brake > 0.001: 
+            bcmd = BrakeCmd()
+            bcmd.enable = True
+            bcmd.pedal_cmd_type = BrakeCmd.CMD_TORQUE
+            bcmd.pedal_cmd = brake
+            self.brake_pub.publish(bcmd)
 
 if __name__ == '__main__':
     DBWNode()

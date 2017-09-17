@@ -6,6 +6,8 @@ from styx_msgs.msg import Lane, Waypoint
 
 import math
 
+from tf.transformations import euler_from_quaternion
+
 '''
 This node will publish waypoints from the car's current position to some `x` distance ahead.
 
@@ -33,28 +35,20 @@ class WaypointUpdater(object):
 
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
 
-
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
-        self.current_position = None
-        self.closest_wp = 0
+        self.latest_waypoints = None
+        self.latest_pose = None
 
         rospy.spin()
 
     def pose_cb(self, msg):
-        self.current_position = msg.pose.position
+        self.latest_pose = msg.pose
+        if self.latest_waypoints:
+            self.prepare_and_publish(self.latest_pose, self.latest_waypoints)
 
-    def waypoints_cb(self, waypoints):
-        map_wp = waypoints.waypoints
-        # find closest waypoint
-        if self.current_position:
-            self.closest_wp = self.closest_waypoint(self.current_position.x, self.current_position.y, map_wp[self.closest_wp:])
-        # publish data
-        lane = Lane()
-        lane.header.frame_id = waypoints.header.frame_id
-        lane.header.stamp = rospy.get_rostime()
-        lane.waypoints = map_wp[self.closest_wp:self.closest_wp+LOOKAHEAD_WPS]
-        self.final_waypoints_pub.publish(lane)
+    def waypoints_cb(self, lane):
+        self.latest_waypoints = lane.waypoints
 
     def traffic_cb(self, msg):
         # TODO: Callback for /traffic_waypoint message. Implement
@@ -63,6 +57,43 @@ class WaypointUpdater(object):
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
         pass
+
+    # NOTE: do not use fields (self.) in this function, pass all data that can be changed by callbacks as a function parameters
+    def prepare_and_publish(self, pose, waypoints):
+
+        closest_wp = self.find_next_waypoint(pose, waypoints)
+        if closest_wp == -1:
+            return # no waypoint found
+  
+        # publish data
+        lane = Lane()
+        lane.header.frame_id = '/world'
+        lane.header.stamp = rospy.Time.now()
+        lane.waypoints = waypoints[closest_wp : closest_wp + LOOKAHEAD_WPS]
+        self.final_waypoints_pub.publish(lane)
+        
+    def find_next_waypoint(self, pose, waypoints):
+        closest = -1
+        closest_distance2 = 1000000000
+        ego_x = pose.position.x
+        ego_y = pose.position.y
+
+        roll, pitch, ego_yaw = euler_from_quaternion([pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w])
+        ego_heading_x = math.cos(ego_yaw)
+        ego_heading_y = math.sin(ego_yaw)
+
+        for (i, wp) in enumerate(waypoints):
+            p = wp.pose.pose.position
+            heading_x = p.x - ego_x
+            heading_y = p.y - ego_y
+            distance2 = (heading_x) * (heading_x) + (heading_y) * (heading_y)
+            if distance2 < closest_distance2:
+                correlation = heading_x * ego_heading_x + heading_y * ego_heading_y
+                if correlation > 0:
+                    closest = i
+                    closest_distance2 = distance2
+
+        return closest
 
     def get_waypoint_velocity(self, waypoint):
         return waypoint.twist.twist.linear.x
@@ -77,24 +108,6 @@ class WaypointUpdater(object):
             dist += dl(waypoints[wp1].pose.pose.position, waypoints[i].pose.pose.position)
             wp1 = i
         return dist
-
-    def distance_sqrt(self, x1, y1, x2, y2):
-        return math.sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1))
-
-    def closest_waypoint(self, x, y, waypoints):
-        closest_len = 100000
-        closest_wp = 0;
-
-        for (i, wp) in enumerate(waypoints):
-            map_x = wp.pose.pose.position.x
-            map_y = wp.pose.pose.position.y
-            dist = self.distance_sqrt(x, y, map_x, map_y)
-            if dist < closest_len:
-                closet_len = dist
-                closest_wp = i
-
-        return closest_wp
-
 
 if __name__ == '__main__':
     try:

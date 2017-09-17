@@ -63,13 +63,16 @@ class WaypointUpdater(object):
 
         closest_wp = self.find_next_waypoint(pose, waypoints)
         if closest_wp == -1:
-            return # no waypoint found
+            rospy.logwarn('no waypoints found ahead of car')
+            return
   
+        rospy.logdebug("next waypoint is %s, total base waypoints %s", closest_wp, len(waypoints))
+
         # publish data
         lane = Lane()
         lane.header.frame_id = '/world'
         lane.header.stamp = rospy.Time.now()
-        lane.waypoints = waypoints[closest_wp : closest_wp + LOOKAHEAD_WPS]
+        lane.waypoints = waypoints[closest_wp : closest_wp + LOOKAHEAD_WPS] # TODO: implement ring buffer
         self.final_waypoints_pub.publish(lane)
         
     def find_next_waypoint(self, pose, waypoints):

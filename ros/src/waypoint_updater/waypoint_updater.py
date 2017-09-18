@@ -44,12 +44,12 @@ class WaypointUpdater(object):
 
     def pose_cb(self, msg):
         self.latest_pose = msg.pose
-        if self.latest_waypoints:
-            self.prepare_and_publish(self.latest_pose, self.latest_waypoints)
 
     def waypoints_cb(self, lane):
         rospy.logdebug("total base waypoints %s", len(lane.waypoints))
         self.latest_waypoints = lane.waypoints
+        if self.latest_pose:
+            self.prepare_and_publish(self.latest_pose, self.latest_waypoints)
 
     def traffic_cb(self, msg):
         # TODO: Callback for /traffic_waypoint message. Implement

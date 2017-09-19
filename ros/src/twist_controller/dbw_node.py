@@ -69,7 +69,9 @@ class DBWNode(object):
         self.twist_cmd = msg
 
     def dbw_enabled_cb(self, msg):
-        self.dbw_enabled = msg.data
+        if self.dbw_enabled != msg.data:
+            self.dbw_enabled = msg.data
+            rospy.loginfo("Switching control %s", 'ON' if self.dbw_enabled else 'OFF')
 
     def current_velocity_cb(self, msg):
         self.current_velocity = msg

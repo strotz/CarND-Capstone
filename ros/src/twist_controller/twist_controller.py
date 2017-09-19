@@ -40,3 +40,7 @@ class Controller(object):
         brake = math.fabs(min(0.0, throttle))
 
         return throttle, brake, steer
+
+    def reset(self):
+        self.pid_throttle.reset()
+        self.pid_steering.reset()

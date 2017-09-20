@@ -20,7 +20,6 @@ class Controller(object):
         self.max_steer_angle = args[9]
 
         self.pid_throttle = PID(0.6, 0.05, 0.1, self.decel_limit, self.accel_limit)
-        self.pid_steering = PID(6.0, 0.3, 1.0, -self.max_steer_angle, self.max_steer_angle)
         self.yaw_controller = YawController(self.wheel_base, self.steer_ratio, 0.0, self.max_lat_accel, self.max_steer_angle)
 
     def control(self, *args, **kwargs):
@@ -32,9 +31,7 @@ class Controller(object):
         velocity_error = proposed_linear_velocity - current_linear_velocity
         throttle = self.pid_throttle.step(velocity_error, dt)
 
-        current_steer = self.yaw_controller.get_steering(proposed_linear_velocity, proposed_angular_velocity, current_linear_velocity)
-        steer_error = proposed_angular_velocity - current_steer
-        steer = self.pid_steering.step(steer_error, dt)
+        steer = self.yaw_controller.get_steering(proposed_linear_velocity, proposed_angular_velocity, current_linear_velocity)
 
         throttle = max(throttle, 0.0)
         brake = math.fabs(min(0.0, throttle))
@@ -43,4 +40,3 @@ class Controller(object):
 
     def reset(self):
         self.pid_throttle.reset()
-        self.pid_steering.reset()

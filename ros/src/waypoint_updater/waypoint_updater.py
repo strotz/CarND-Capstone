@@ -40,7 +40,17 @@ class WaypointUpdater(object):
         self.latest_waypoints = None
         self.latest_pose = None
 
-        rospy.spin()
+        self.loop()
+
+    def loop(self):
+        rate = rospy.Rate(50)
+        while not rospy.is_shutdown():
+            latest_pose = self.latest_pose
+            latest_waypoints = self.latest_waypoints
+            if (latest_pose is not None) and (latest_waypoints is not None):
+                self.prepare_and_publish(latest_pose, latest_waypoints)
+
+            rate.sleep()
 
     def pose_cb(self, msg):
         self.latest_pose = msg.pose
@@ -48,8 +58,7 @@ class WaypointUpdater(object):
     def waypoints_cb(self, lane):
         rospy.logdebug("total base waypoints %s", len(lane.waypoints))
         self.latest_waypoints = lane.waypoints
-        if self.latest_pose:
-            self.prepare_and_publish(self.latest_pose, self.latest_waypoints)
+        
 
     def traffic_cb(self, msg):
         # TODO: Callback for /traffic_waypoint message. Implement

@@ -185,7 +185,7 @@ class TLDetector(object):
         light_wp = -1
         # List of positions that correspond to the line to stop in front of for a given intersection
         stop_line_positions = self.config['stop_line_positions']        
-        if(self.pose and self.waypoints):
+        if(self.pose and self.waypoints and self.lights):
             car_position = self.get_closest_waypoint(self.pose.pose)
             stop_line_waypoints = []
             line_pose = Pose()
@@ -196,10 +196,9 @@ class TLDetector(object):
                 stop_line_waypoints.append(line_position)
             # Find the nearest stop line in front of the vehicle.
             stop_line_idx = np.searchsorted(stop_line_waypoints, [car_position,], side='right')[0]
-            light_wp = stop_line_waypoints[stop_line_idx]
-            rospy.loginfo("next stop line: {}".format(light_wp))
-
-        #TODO find the closest visible traffic light (if one exists)
+            light_wp = stop_line_waypoints[stop_line_idx]            
+            # Find the closest visible traffic light (if one exists)
+            light = self.lights[stop_line_idx]
 
         if light:
             state = self.get_light_state(light)

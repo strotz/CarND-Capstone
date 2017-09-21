@@ -10,6 +10,8 @@ from light_classification.tl_classifier import TLClassifier
 import tf
 import cv2
 import yaml
+import math
+import numpy as np
 
 STATE_COUNT_THRESHOLD = 3
 
@@ -100,8 +102,15 @@ class TLDetector(object):
             int: index of the closest waypoint in self.waypoints
 
         """
-        #TODO implement
-        return 0
+        closest_len = 100000
+        closest_wp_i = 0
+        dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2)
+        for i, wp in enumerate(self.waypoints.waypoints):
+            dist = dl(pose.position, wp.pose.pose.position)
+            if (dist < closest_len):
+                closest_len = dist
+                closest_wp_i = i
+        return closest_wp_i
 
 
     def project_to_image_plane(self, point_in_world):
@@ -173,11 +182,22 @@ class TLDetector(object):
 
         """
         light = None
-
+        light_wp = -1
         # List of positions that correspond to the line to stop in front of for a given intersection
-        stop_line_positions = self.config['stop_line_positions']
-        if(self.pose):
+        stop_line_positions = self.config['stop_line_positions']        
+        if(self.pose and self.waypoints):
             car_position = self.get_closest_waypoint(self.pose.pose)
+            stop_line_waypoints = []
+            line_pose = Pose()
+            for lx, ly in stop_line_positions:
+                line_pose.position.x = lx
+                line_pose.position.y = ly
+                line_position = self.get_closest_waypoint(line_pose)
+                stop_line_waypoints.append(line_position)
+            # Find the nearest stop line in front of the vehicle.
+            stop_line_idx = np.searchsorted(stop_line_waypoints, [car_position,], side='right')[0]
+            light_wp = stop_line_waypoints[stop_line_idx]
+            rospy.loginfo("next stop line: {}".format(light_wp))
 
         #TODO find the closest visible traffic light (if one exists)
 

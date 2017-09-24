@@ -196,12 +196,13 @@ class TLDetector(object):
                 stop_line_waypoints.append(line_position)
             # Find the nearest stop line in front of the vehicle.
             stop_line_idx = np.searchsorted(stop_line_waypoints, [car_position,], side='right')[0]
-            light_wp = stop_line_waypoints[stop_line_idx]            
+            light_wp = stop_line_waypoints[stop_line_idx]
             # Find the closest visible traffic light (if one exists)
             light = self.lights[stop_line_idx]
 
         if light:
-            state = self.get_light_state(light)
+            # state = self.get_light_state(light)
+            state = light.state
             return light_wp, state
         self.waypoints = None
         return -1, TrafficLight.UNKNOWN

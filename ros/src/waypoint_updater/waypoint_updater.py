@@ -3,6 +3,7 @@
 import rospy
 from geometry_msgs.msg import PoseStamped
 from styx_msgs.msg import Lane, Waypoint
+from std_msgs.msg import Int32
 
 import math
 
@@ -32,13 +33,15 @@ class WaypointUpdater(object):
 
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
-
-        # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
+        rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
 
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
         self.latest_waypoints = None
         self.latest_pose = None
+        self.latest_wp = None
+        self.redlight_wp = None
+        self.slow_down = False
 
         self.loop()
 
@@ -61,8 +64,13 @@ class WaypointUpdater(object):
         
 
     def traffic_cb(self, msg):
-        # TODO: Callback for /traffic_waypoint message. Implement
-        pass
+        self.redlight_wp = msg.data
+        if self.redlight_wp > 0:
+            dist = self.distance(self.latest_waypoints, self.latest_wp, self.redlight_wp)
+            if dist < 20:
+                self.slow_down = True
+        else:
+            self.slow_down = False
 
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
@@ -70,8 +78,8 @@ class WaypointUpdater(object):
 
     # NOTE: do not use fields (self.) in this function, pass all data that can be changed by callbacks as a function parameters
     def prepare_and_publish(self, pose, waypoints):
-
         closest_wp = self.find_next_waypoint(pose, waypoints)
+        self.latest_wp = closest_wp
         if closest_wp == -1:
             rospy.logwarn('no waypoints found ahead of car')
             return

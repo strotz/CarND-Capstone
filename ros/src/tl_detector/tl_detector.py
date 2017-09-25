@@ -12,12 +12,14 @@ import cv2
 import yaml
 import math
 import numpy as np
+import os
+import scipy.misc
 
 STATE_COUNT_THRESHOLD = 3
 
 class TLDetector(object):
     def __init__(self):
-        rospy.init_node('tl_detector')
+        rospy.init_node('tl_detector', log_level=rospy.DEBUG)
 
         self.pose = None
         self.waypoints = None
@@ -142,15 +144,26 @@ class TLDetector(object):
             return None
 
         # Use transform and rotation to calculate 2D position of light in image
+        l = point_in_world
 
-        M = np.dot(tf.transformations.translation_matrix(trans),
-                   tf.transformations.quaternion_matrix(rot))
-        p = point_in_world
-        V = np.dot(M, np.array([[p.x], [p.y], [p.z], [1.0]]))
+        pos = self.pose.pose.position
+        ori = self.pose.pose.orientation
 
-        x = -fx * V[1] / V[0] + 0.5 * image_width
-        y = -fy * V[2] / V[0] + 0.5 * image_height
+        theta = math.atan2(2.0 * (ori.w * ori.z + ori.x * ori.y), 1.0 - 2.0 * (ori.y * ori.y + ori.z * ori.z))
+        dx = l.x - pos.x
+        dy = l.y - pos.y
 
+        X = dy * math.sin(theta) + dx * math.cos(theta)
+        Y = dy * math.cos(theta) - dx * math.sin(theta)
+
+        pts = np.array([[X, Y, 0.0]], dtype=np.float32)
+        mat = np.array([[fx,  0, image_width / 2],
+                        [ 0, fy, image_height / 2],
+                        [ 0,  0,  1]], dtype=np.float32)
+        proj, d = cv2.projectPoints(pts, (0,0,0), (0,0,0), mat, None)
+
+        x = int(proj[0,0,0])
+        y = int(proj[0,0,1])
         return (x, y)
 
     def get_light_state(self, light):
@@ -169,12 +182,44 @@ class TLDetector(object):
 
         cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
 
-        x, y = self.project_to_image_plane(light.pose.pose.position)
+        l = light.pose.pose.position
+        c = self.pose.pose.position
+        dist = math.sqrt((l.x - c.x) ** 2 + (l.y - c.y) ** 2 + (l.z - c.z) ** 2)
 
-        #TODO use light location to zoom in on traffic light in image
+        MIN_DIST = 50 # meters
+        if dist > MIN_DIST:
+            rospy.logdebug('light is too far: ' + str(dist) + 'm')
+            return TrafficLight.UNKNOWN
 
-        #Get classification
-        return self.light_classifier.get_classification(cv_image)
+        pr = self.project_to_image_plane(l)
+        if pr is None:
+            return TrafficLight.UNKNOWN
+        x, y = pr
+
+        rospy.logdebug('x = ' + str(x) + ' y = ' + str(y))
+
+        # use light location to zoom in on traffic light in image
+        image_width = self.config['camera_info']['image_width']
+        image_height = self.config['camera_info']['image_height']
+
+        lw = int(image_width / 4)
+        lh = int(image_height / 4)
+
+        y = y + lh / 2
+
+        top = int(y - lh)
+        bottom = int(y + lh)
+        left = int(x - lw)
+        right = int(x + lw)
+
+        if top < 0 or bottom > image_height or left < 0 or right > image_width:
+            rospy.logdebug('Invalid ROI: ' + str(top) + ', ' + str(bottom) + ', ' + str(left) + ', ' + str(right))
+            return TrafficLight.UNKNOWN
+
+        roi = cv_image[top:bottom,left:right]
+
+        # Get classification
+        return self.light_classifier.get_classification(roi)
 
     def process_traffic_lights(self):
         """Finds closest visible traffic light, if one exists, and determines its
@@ -205,9 +250,9 @@ class TLDetector(object):
             light = self.lights[stop_line_idx]
 
         if light:
-            # state = self.get_light_state(light)
-            state = light.state
+            state = self.get_light_state(light)
             return light_wp, state
+
         self.waypoints = None
         return -1, TrafficLight.UNKNOWN
 

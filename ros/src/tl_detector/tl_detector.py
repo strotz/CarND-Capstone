@@ -112,7 +112,6 @@ class TLDetector(object):
                 closest_wp_i = i
         return closest_wp_i
 
-
     def project_to_image_plane(self, point_in_world):
         """Project point from 3D world coordinates to 2D camera image location
 
@@ -131,7 +130,6 @@ class TLDetector(object):
         image_height = self.config['camera_info']['image_height']
 
         # get transform between pose of camera and world frame
-        trans = None
         try:
             now = rospy.Time.now()
             self.listener.waitForTransform("/base_link",
@@ -141,11 +139,17 @@ class TLDetector(object):
 
         except (tf.Exception, tf.LookupException, tf.ConnectivityException):
             rospy.logerr("Failed to find camera to map transform")
+            return None
 
-        #TODO Use tranform and rotation to calculate 2D position of light in image
+        # Use transform and rotation to calculate 2D position of light in image
 
-        x = 0
-        y = 0
+        M = np.dot(tf.transformations.translation_matrix(trans),
+                   tf.transformations.quaternion_matrix(rot))
+        p = point_in_world
+        V = np.dot(M, np.array([[p.x], [p.y], [p.z], [1.0]]))
+
+        x = -fx * V[1] / V[0] + 0.5 * image_width
+        y = -fy * V[2] / V[0] + 0.5 * image_height
 
         return (x, y)
 

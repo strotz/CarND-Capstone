@@ -25,7 +25,8 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
 LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
-
+MAX_SPEED = 10.0
+MIN_SPEED = 0.0
 
 class WaypointUpdater(object):
     def __init__(self):
@@ -42,6 +43,7 @@ class WaypointUpdater(object):
         self.latest_wp = None
         self.redlight_wp = None
         self.slow_down = False
+        self.velocities = []
 
         self.loop()
 
@@ -67,8 +69,18 @@ class WaypointUpdater(object):
         self.redlight_wp = msg.data
         if self.redlight_wp > 0:
             dist = self.distance(self.latest_waypoints, self.latest_wp, self.redlight_wp)
-            if dist < 20:
+            if dist < 50:
+                n_wp = self.redlight_wp - self.latest_wp
+                v = max(self.get_waypoint_velocity(self.latest_waypoints[self.latest_wp]), MIN_SPEED)
+                dv = v / n_wp
+                next_v = v
+                self.velocities = []
+                for i in range(n_wp):
+                    next_v -= dv
+                    self.velocities.append(max(next_v, 0.0))
                 self.slow_down = True
+            else:
+                self.slow_down = False
         else:
             self.slow_down = False
 
@@ -92,6 +104,17 @@ class WaypointUpdater(object):
             send.append(waypoints[ 0 : (LOOKAHEAD_WPS - tail)])
 
         rospy.logdebug("lenght of waypoints to send is %s", len(send))
+
+        # set velocities
+        for i in range(LOOKAHEAD_WPS):
+            if self.slow_down:
+                if (i < len(self.velocities)):
+                    v = self.velocities[i]
+                else:
+                    v = 0.0
+            else:
+                v = MAX_SPEED
+            self.set_waypoint_velocity(send, i, v)
 
         # publish data
         lane = Lane()

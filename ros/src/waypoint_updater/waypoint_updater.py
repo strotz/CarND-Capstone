@@ -6,6 +6,7 @@ from styx_msgs.msg import Lane, Waypoint
 from std_msgs.msg import Int32
 
 import math
+import copy
 
 from tf.transformations import euler_from_quaternion
 
@@ -25,8 +26,7 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
 LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
-MAX_SPEED = 10.0
-MIN_SPEED = 0.0
+MAX_SPEED = 20*0.447
 
 class WaypointUpdater(object):
     def __init__(self):
@@ -41,9 +41,7 @@ class WaypointUpdater(object):
         self.latest_waypoints = None
         self.latest_pose = None
         self.latest_wp = None
-        self.redlight_wp = None
-        self.slow_down = False
-        self.velocities = []
+        self.redlight_wp = -1
 
         self.loop()
 
@@ -62,27 +60,10 @@ class WaypointUpdater(object):
 
     def waypoints_cb(self, lane):
         rospy.logdebug("total base waypoints %s", len(lane.waypoints))
-        self.latest_waypoints = lane.waypoints
-        
+        self.latest_waypoints = lane.waypoints        
 
     def traffic_cb(self, msg):
         self.redlight_wp = msg.data
-        if self.redlight_wp > 0:
-            dist = self.distance(self.latest_waypoints, self.latest_wp, self.redlight_wp)
-            if dist < 50:
-                n_wp = self.redlight_wp - self.latest_wp
-                v = max(self.get_waypoint_velocity(self.latest_waypoints[self.latest_wp]), MIN_SPEED)
-                dv = v / n_wp
-                next_v = v
-                self.velocities = []
-                for i in range(n_wp):
-                    next_v -= dv
-                    self.velocities.append(max(next_v, 0.0))
-                self.slow_down = True
-            else:
-                self.slow_down = False
-        else:
-            self.slow_down = False
 
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
@@ -105,13 +86,18 @@ class WaypointUpdater(object):
 
         rospy.logdebug("lenght of waypoints to send is %s", len(send))
 
-        # set velocities
-        for i in range(LOOKAHEAD_WPS):
-            if self.slow_down:
-                if (i < len(self.velocities)):
-                    v = self.velocities[i]
-                else:
+        # Slow down if there is a red light in front
+        dist = self.distance(self.latest_waypoints, closest_wp, self.redlight_wp)
+        dist_wp = self.redlight_wp - closest_wp
+        current_velocity = self.get_waypoint_velocity(self.latest_waypoints[closest_wp])
+        dv = current_velocity / dist_wp
+        for i in range(len(send)):
+            if self.redlight_wp > -1 and dist < 50:
+                next_wp = dist_wp - i
+                if next_wp < 8:
                     v = 0.0
+                else:
+                    v = max(current_velocity - i * dv, 0.0)
             else:
                 v = MAX_SPEED
             self.set_waypoint_velocity(send, i, v)

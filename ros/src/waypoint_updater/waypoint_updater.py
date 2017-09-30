@@ -141,9 +141,14 @@ class WaypointUpdater(object):
     def distance(self, waypoints, wp1, wp2):
         dist = 0
         dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
-        for i in range(wp1, wp2+1):
-            dist += dl(waypoints[wp1].pose.pose.position, waypoints[i].pose.pose.position)
-            wp1 = i
+        
+        total = len(waypoints)
+        path = (wp2-wp1) if (wp2>=wp1) else (wp2+total-wp1) # to cover circular nature of waypoints
+        for i in range(0, path+1):
+            start = (wp1+i) % total
+            next = (start+1) % total  
+            dist += dl(waypoints[start].pose.pose.position, waypoints[next].pose.pose.position)
+            
         return dist
 
 if __name__ == '__main__':

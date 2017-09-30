@@ -49,7 +49,7 @@ class TLClassifier(object):
             g = green / norm
             r = red / norm
 
-            if g > 0.3 and r > 0.3:
+            if g > 0.4 and r > 0.4:
                 rospy.logdebug('Light is YELLOW')
                 return TrafficLight.YELLOW
             elif r > 0.5:

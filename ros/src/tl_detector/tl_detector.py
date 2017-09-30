@@ -31,7 +31,7 @@ class TLDetector(object):
 
         self.camera_image = None
         
-        self.lights = []
+        self.lights = None
 
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
@@ -117,10 +117,10 @@ class TLDetector(object):
             https://en.wikipedia.org/wiki/Closest_pair_of_points_problem
         Args:
             pose (Pose): position to match a waypoint to
-            waypoins: 
+            waypoins: array of waypoints to search. 
 
         Returns:
-            int: index of the closest waypoint in self.waypoints
+            int: index of the closest waypoint in waypoints
 
         """
         closest = -1
@@ -306,19 +306,23 @@ class TLDetector(object):
         stop_line_waypoints = self.stop_line_waypoints
         lights = self.lights
 
-        if (pose and waypoints and lights and stop_line_waypoints):
-            car_position_wp = self.find_next_waypoint(pose, waypoints)
+        if (pose and waypoints and stop_line_waypoints):
+            car_position_wp = self.find_next_waypoint(pose, waypoints) # index of waypoint in front of the car
 
             # Find the nearest stop line in front of the vehicle.
             stop_line_idx = np.searchsorted(stop_line_waypoints, [car_position_wp,], side='right')[0]
-            light_wp = stop_line_waypoints[stop_line_idx]
+            light_wp = stop_line_waypoints[stop_line_idx] # index of waypoint associated with stop line, first part of the result
 
             # Find the closest visible traffic light (if one exists)
+            if (lights):
+                stop_line_waypoint = waypoints[light_wp] 
+                light_index = self.get_closest_waypoint(stop_line_waypoint.pose.pose, lights)
+                state = lights[light_index].state
+
+                rospy.loginfo("car %s stop %s light %s state %s", car_position_wp, light_wp, light_index, state)
+                return light_wp, state
             # was light = self.lights[stop_line_idx]
 
-            stop_line_waypoint = waypoints[stop_line_idx]
-            light_index = self.get_closest_waypoint(stop_line_waypoint.pose.pose, lights)
-            rospy.loginfo("car %s stop %s light %s state %s", car_position_wp, light_wp, light_index, lights[light_index].state)
 
         # if light:
         #     state = self.get_light_state(light)

@@ -188,15 +188,13 @@ class TLDetector(object):
 
         MIN_DIST = 50 # meters
         if dist > MIN_DIST:
-            rospy.logdebug('light is too far: ' + str(dist) + 'm')
+            rospy.logdebug('light is too far: ' + str(dist) + ' m')
             return TrafficLight.UNKNOWN
 
         pr = self.project_to_image_plane(l)
         if pr is None:
             return TrafficLight.UNKNOWN
         x, y = pr
-
-        rospy.logdebug('x = ' + str(x) + ' y = ' + str(y))
 
         # use light location to zoom in on traffic light in image
         image_width = self.config['camera_info']['image_width']
@@ -252,6 +250,7 @@ class TLDetector(object):
         if light:
             state = self.get_light_state(light)
             return light_wp, state
+
 
         self.waypoints = None
         return -1, TrafficLight.UNKNOWN

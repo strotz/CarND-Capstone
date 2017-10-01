@@ -158,28 +158,6 @@ class TLDetector(object):
 
         return closest
 
-
-    def get_closest_light(self, pose):
-        """Identifies the closest light to the given position
-        Args:
-            pose (Pose): position to match a light to
-
-        Returns:
-            int: index of the closest lights in self.lights
-
-        """
-        closest_len = 100000
-        closest_idx = -1
-        closest_light = None
-        dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2)
-        for i, l in enumerate(self.lights):
-            dist = dl(pose.position, l.pose.pose.position)
-            if (dist < closest_len):
-                closest_len = dist
-                closest_idx = i
-                closest_light = l
-        return (closest_idx, closest_light, closest_len)
-
     @staticmethod
     def to_car_coordinates(car_position, car_orientation, point_in_world):
         l = point_in_world
@@ -195,6 +173,7 @@ class TLDetector(object):
         Y = dy * math.cos(theta) - dx * math.sin(theta)
 
         return (X, Y)
+
 
     def project_to_image_plane(self, point_in_world):
         """Project point from 3D world coordinates to 2D camera image location
@@ -226,7 +205,7 @@ class TLDetector(object):
             return None
 
         # Use transform and rotation to calculate 2D position of light in image
-        X, Y = TLDetector.to_car_coordinates(self.pose.pose.position, self.pose.pose.orientation, point_in_world)
+        X, Y = TLDetector.to_car_coordinates(self.pose.position, self.pose.orientation, point_in_world)
 
         pts = np.array([[X, Y, 0.0]], dtype=np.float32)
         mat = np.array([[fx,  0, image_width / 2],
@@ -237,6 +216,7 @@ class TLDetector(object):
         x = int(proj[0,0,0])
         y = int(proj[0,0,1])
         return (x, y)
+
 
     def get_light_state(self, light):
         """Determines the current color of the traffic light
@@ -280,7 +260,8 @@ class TLDetector(object):
         # Get classification
         return self.light_classifier.get_classification(roi)
 
-    def load_stop_line_waypoints(self, waypoints): # TODO: seems like we need to do it once on waypoint update
+
+    def load_stop_line_waypoints(self, waypoints):
 
         # List of positions that correspond to the line to stop in front of for a given intersection
         stop_line_positions = self.config['stop_line_positions'] 
@@ -307,7 +288,6 @@ class TLDetector(object):
         """
         light = None
         light_wp = -1
-
 
         # to prevent issues with multitreaded update
         pose = self.pose
@@ -339,10 +319,9 @@ class TLDetector(object):
         if light_index == -1:
             rospy.logdebug('light is not found')
             return -1, TrafficLight.UNKNOWN
-
         light = lights[light_index]
 
-        X, Y = TLDetector.to_car_coordinates(pose.pose.position, pose.pose.orientation, light.pose.pose.position)
+        X, Y = TLDetector.to_car_coordinates(pose.position, pose.orientation, light.pose.pose.position)
         if X < 5:
             rospy.logdebug('light is back from the car')
             return -1, TrafficLight.UNKNOWN
@@ -368,6 +347,9 @@ class TLDetector(object):
             dist += dl(waypoints[start].pose.pose.position, waypoints[next].pose.pose.position)
 
         return dist
+
+    def how_many_ahead(self, current, end, total):
+        return (end - current) if (end >= current) else (end + total - current) # to cover circular nature of waypoints
 
 
 if __name__ == '__main__':

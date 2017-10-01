@@ -131,7 +131,7 @@ class WaypointUpdater(object):
 
     # TODO: it need to keep moving car until it reaches target
     def build_slowdown_profile(self, waypoints, current_velocity, target_wp):
-        dv = -current_velocity / target_wp if target_wp > 0 else 0
+        dv = -current_velocity / target_wp if target_wp > 0.005 else 0
         for i in range(len(waypoints)):
             if (i < target_wp):
                 v = current_velocity + dv * i

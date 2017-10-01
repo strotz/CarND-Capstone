@@ -90,6 +90,8 @@ class WaypointUpdater(object):
         dist = self.distance(self.latest_waypoints, closest_wp, self.redlight_wp)
         dist_wp = self.redlight_wp - closest_wp
         current_velocity = self.get_waypoint_velocity(self.latest_waypoints[closest_wp])
+        if dist_wp < 0.001:
+            dist_wp = 0.001
         dv = current_velocity / dist_wp
         for i in range(len(send)):
             if self.redlight_wp > -1 and dist < 50:

@@ -273,9 +273,11 @@ class TLDetector(object):
         line_pose.position.y = ly
         light_wp = self.get_closest_waypoint(line_pose)
 
-        if light:
-            state = self.get_light_state(light)
-            return light_wp, state
+        state = self.get_light_state(light)
+        if state == TrafficLight.UNKNOWN:
+            return -1, TrafficLight.UNKNOWN
+
+        return light_wp, state
 
 if __name__ == '__main__':
     try:

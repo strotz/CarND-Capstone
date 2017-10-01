@@ -297,29 +297,31 @@ class TLDetector(object):
         stop_line_waypoints = self.stop_line_waypoints
         lights = self.lights
 
-        if (pose and waypoints and stop_line_waypoints):
+        if pose and waypoints and stop_line_waypoints and lights:
             car_position_wp = self.find_next_waypoint(pose, waypoints) # index of waypoint in front of the car
+            if car_position_wp == -1:
+                return -1, TrafficLight.UNKNOWN
 
             # Find the nearest stop line in front of the vehicle.
             stop_line_idx = np.searchsorted(stop_line_waypoints, [car_position_wp,], side='right')[0]
             light_wp = stop_line_waypoints[stop_line_idx] # index of waypoint associated with stop line, first part of the result
+            # TODO: this position could be far away, can skip
 
             # Find the closest visible traffic light (if one exists)
-            
-            if (lights): # this branch will work with simulator
-                stop_line_waypoint = waypoints[light_wp] 
-                light_index = self.get_closest_waypoint(stop_line_waypoint.pose.pose, lights)
-                state = lights[light_index].state
+            stop_line_waypoint = waypoints[light_wp] 
+            light_index = self.get_closest_waypoint(stop_line_waypoint.pose.pose, lights)
+            if light_index == -1:
+                return -1, TrafficLight.UNKNOWN
 
-                # rospy.loginfo("car %s stop %s light %s state %s", car_position_wp, light_wp, light_index, state)
+            light = lights[light_index]
+            
+            use_simulated_red = False
+            if use_simulated_red: # this branch will work with simulator
+                state = light.state
                 return light_wp, state
 
-            # was light = self.lights[stop_line_idx]
-
-
-        # if light:
-        #     state = self.get_light_state(light)
-        #     return light_wp, state
+            state = self.get_light_state(light)
+            return light_wp, state
 
         return -1, TrafficLight.UNKNOWN
 

@@ -95,11 +95,6 @@ class TLDetector(object):
         used.
         '''
 
-        # TODO: state is always 4 (unknown), should be 0 (red) sometimes
-        rospy.logdebug("state %s self.state %s and count %s", state, self.state, self.state_count)
-        if state == TrafficLight.RED:
-            rospy.loginfo("RED")
-
         if self.state != state:
             self.state_count = 0
             self.state = state
@@ -314,13 +309,15 @@ class TLDetector(object):
             light_wp = stop_line_waypoints[stop_line_idx] # index of waypoint associated with stop line, first part of the result
 
             # Find the closest visible traffic light (if one exists)
-            if (lights):
+            
+            if (lights): # this branch will work with simulator
                 stop_line_waypoint = waypoints[light_wp] 
                 light_index = self.get_closest_waypoint(stop_line_waypoint.pose.pose, lights)
                 state = lights[light_index].state
 
-                rospy.loginfo("car %s stop %s light %s state %s", car_position_wp, light_wp, light_index, state)
+                # rospy.loginfo("car %s stop %s light %s state %s", car_position_wp, light_wp, light_index, state)
                 return light_wp, state
+
             # was light = self.lights[stop_line_idx]
 
 
@@ -328,7 +325,6 @@ class TLDetector(object):
         #     state = self.get_light_state(light)
         #     return light_wp, state
 
-        # self.waypoints = None
         return -1, TrafficLight.UNKNOWN
 
 if __name__ == '__main__':

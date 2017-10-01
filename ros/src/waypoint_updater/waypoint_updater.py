@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import rospy
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, TwistStamped
 from styx_msgs.msg import Lane, Waypoint
 from std_msgs.msg import Int32
 
@@ -26,20 +26,25 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
 LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
-MAX_SPEED = 20*0.447
+MAX_SPEED = 20 * 0.447
 
 class WaypointUpdater(object):
     def __init__(self):
         rospy.init_node('waypoint_updater', log_level=rospy.DEBUG)
 
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
+        rospy.Subscriber('/current_velocity', TwistStamped, self.current_velocity_cb)
+
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
         rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
 
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
         self.latest_waypoints = None
+
         self.latest_pose = None
+        self.current_velocity = 0 # TODO: not a best way 
+        
         self.redlight_wp = -1
 
         self.loop()
@@ -56,6 +61,10 @@ class WaypointUpdater(object):
 
     def pose_cb(self, msg):
         self.latest_pose = msg.pose
+
+    def current_velocity_cb(self, msg):
+        self.current_velocity = msg.twist.linear.x
+
 
     def waypoints_cb(self, lane):
         rospy.logdebug("total base waypoints %s", len(lane.waypoints))
@@ -75,42 +84,38 @@ class WaypointUpdater(object):
             rospy.logwarn('no waypoints found ahead of car')
             return
   
-        rospy.logdebug("closest next waypoint is %s", closest_wp)
+        # rospy.logdebug("closest next waypoint is %s", closest_wp)
 
         tail = len(waypoints) - closest_wp
         send = waypoints[ closest_wp : closest_wp + min(LOOKAHEAD_WPS, tail) ]
         if tail < LOOKAHEAD_WPS:
             send.append(waypoints[ 0 : (LOOKAHEAD_WPS - tail)])
 
-        current_velocity = self.get_waypoint_velocity(waypoints[closest_wp]) # TODO: can we get it from sensor data?
-
         # Slow down if there is a red light in front
         redlight_wp = self.redlight_wp
-        rospy.logdebug("closest next red light is %s", redlight_wp)
+        current_velocity = self.current_velocity
 
-        if redlight_wp >= 0: # redlight detected
+        if redlight_wp >= 0: # redlight detected ahead
             distance_to_red_light = self.distance(waypoints, closest_wp, redlight_wp) # in meters
-            if distance_to_red_light < 50: # TODO: it should depend on current speed
-                rospy.loginfo("red light detected, slowdown from %s", current_velocity)
-                send = self.build_slowdown_profile(send, current_velocity)
-            else:
-                send = self.build_keepspeed_profile(send, current_velocity, MAX_SPEED)
-        else:
-            send = self.build_keepspeed_profile(send, current_velocity, MAX_SPEED)
+            # rospy.logdebug("current speed %s light %s stop %s", current_velocity, distance_to_red_light, distance_to_stop)
 
-        # dist = self.distance(waypoints, closest_wp, self.redlight_wp)
-        # dist_wp = self.redlight_wp - closest_wp
-        # dv = current_velocity / dist_wp
-        # for i in range(len(send)):
-        #     if self.redlight_wp > -1 and dist < 50:
-        #         next_wp = dist_wp - i
-        #         if next_wp < 8:
-        #             v = 0.0
-        #         else:
-        #             v = max(current_velocity - i * dv, 0.0)
-        #     else:
-        #         v = MAX_SPEED
-        #     self.set_waypoint_velocity(send, i, v)
+            # TODO: it is better to use current velocity and deccelatarion to calculate smoother profile
+            SLOW_DISTANCE = 15
+            STOP_DISTANCE = 1 
+            if distance_to_red_light <= STOP_DISTANCE: 
+                rospy.logdebug("STOP from %s", current_velocity)
+                send = self.build_stop_profile(send)
+            elif distance_to_red_light < SLOW_DISTANCE:
+                rospy.logdebug("SLOW from %s", current_velocity)                
+                target_wp = self.how_many_ahead(closest_wp, redlight_wp, len(waypoints))
+                send = self.build_slowdown_profile(send, current_velocity, min(target_wp,LOOKAHEAD_WPS))    
+            else:
+                rospy.logdebug("KEEP (*)")
+                send = self.build_keepspeed_profile(send, MAX_SPEED)                
+
+        else:
+            rospy.logdebug("KEEP")
+            send = self.build_keepspeed_profile(send, MAX_SPEED)
 
         # publish data
         lane = Lane()
@@ -119,14 +124,25 @@ class WaypointUpdater(object):
         lane.waypoints = send
         self.final_waypoints_pub.publish(lane)
 
-    def build_slowdown_profile(self, waypoints, current_velocity):
+    def build_stop_profile(self, waypoints):
         for i in range(len(waypoints)):
-            self.set_waypoint_velocity(waypoints, i, 0.0) # TODO: it is not really profile, just a start
+            self.set_waypoint_velocity(waypoints, i, 0.0)
         return waypoints
 
-    def build_keepspeed_profile(self, waypoints, start_velocity, target_velocity):
+    # TODO: it need to keep moving car until it reaches target
+    def build_slowdown_profile(self, waypoints, current_velocity, target_wp):
+        dv = -current_velocity / target_wp if target_wp > 0 else 0
         for i in range(len(waypoints)):
-            self.set_waypoint_velocity(waypoints, i, target_velocity) # TODO: it is not really profile, just a start
+            if (i < target_wp):
+                v = current_velocity + dv * i
+            else:
+                v = 0.0
+            self.set_waypoint_velocity(waypoints, i, 0.0)
+        return waypoints
+
+    def build_keepspeed_profile(self, waypoints, target_velocity):
+        for i in range(len(waypoints)):
+            self.set_waypoint_velocity(waypoints, i, target_velocity)
         return waypoints
 
     def find_next_waypoint(self, pose, waypoints):

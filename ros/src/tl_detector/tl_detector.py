@@ -114,6 +114,43 @@ class TLDetector(object):
                 closest_wp_i = i
         return closest_wp_i
 
+    def get_closest_light(self, pose):
+        """Identifies the closest light to the given position
+        Args:
+            pose (Pose): position to match a light to
+
+        Returns:
+            int: index of the closest lights in self.lights
+
+        """
+        closest_len = 100000
+        closest_idx = -1
+        closest_light = None
+        dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2)
+        for i, l in enumerate(self.lights):
+            dist = dl(pose.position, l.pose.pose.position)
+            if (dist < closest_len):
+                closest_len = dist
+                closest_idx = i
+                closest_light = l
+        return (closest_idx, closest_light, closest_len)
+
+    @staticmethod
+    def to_car_coordinates(car_position, car_orientation, point_in_world):
+        l = point_in_world
+
+        pos = car_position
+        ori = car_orientation
+
+        theta = math.atan2(2.0 * (ori.w * ori.z + ori.x * ori.y), 1.0 - 2.0 * (ori.y * ori.y + ori.z * ori.z))
+        dx = l.x - pos.x
+        dy = l.y - pos.y
+
+        X = dy * math.sin(theta) + dx * math.cos(theta)
+        Y = dy * math.cos(theta) - dx * math.sin(theta)
+
+        return (X, Y)
+
     def project_to_image_plane(self, point_in_world):
         """Project point from 3D world coordinates to 2D camera image location
 
@@ -144,17 +181,7 @@ class TLDetector(object):
             return None
 
         # Use transform and rotation to calculate 2D position of light in image
-        l = point_in_world
-
-        pos = self.pose.pose.position
-        ori = self.pose.pose.orientation
-
-        theta = math.atan2(2.0 * (ori.w * ori.z + ori.x * ori.y), 1.0 - 2.0 * (ori.y * ori.y + ori.z * ori.z))
-        dx = l.x - pos.x
-        dy = l.y - pos.y
-
-        X = dy * math.sin(theta) + dx * math.cos(theta)
-        Y = dy * math.cos(theta) - dx * math.sin(theta)
+        X, Y = TLDetector.to_car_coordinates(self.pose.pose.position, self.pose.pose.orientation, point_in_world)
 
         pts = np.array([[X, Y, 0.0]], dtype=np.float32)
         mat = np.array([[fx,  0, image_width / 2],
@@ -182,16 +209,7 @@ class TLDetector(object):
 
         cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
 
-        l = light.pose.pose.position
-        c = self.pose.pose.position
-        dist = math.sqrt((l.x - c.x) ** 2 + (l.y - c.y) ** 2 + (l.z - c.z) ** 2)
-
-        MIN_DIST = 50 # meters
-        if dist > MIN_DIST:
-            rospy.logdebug('light is too far: ' + str(dist) + ' meters')
-            return TrafficLight.UNKNOWN
-
-        pr = self.project_to_image_plane(l)
+        pr = self.project_to_image_plane(light.pose.pose.position)
         if pr is None:
             return TrafficLight.UNKNOWN
         x, y = pr
@@ -226,32 +244,38 @@ class TLDetector(object):
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
 
         """
-        light = None
-        light_wp = -1
+
+        if self.pose is None or self.waypoints is None or self.lights is None:
+            return -1, TrafficLight.UNKNOWN
+
+        idx, light, dist = self.get_closest_light(self.pose.pose)
+
+        if light is None:
+            rospy.logdebug('light is not found')
+            return -1, TrafficLight.UNKNOWN
+
+        MAX_DIST = 80  # meters
+        if MAX_DIST < dist:
+            rospy.logdebug('light is too far: ' + str(dist) + ' meters')
+            return -1, TrafficLight.UNKNOWN
+
+        X, Y = TLDetector.to_car_coordinates(self.pose.pose.position, self.pose.pose.orientation, light.pose.pose.position)
+
+        if X < 5:
+            rospy.logdebug('light is back from the car')
+            return -1, TrafficLight.UNKNOWN
+
         # List of positions that correspond to the line to stop in front of for a given intersection
-        stop_line_positions = self.config['stop_line_positions']        
-        if(self.pose and self.waypoints and self.lights):
-            car_position = self.get_closest_waypoint(self.pose.pose)
-            stop_line_waypoints = []
-            line_pose = Pose()
-            for lx, ly in stop_line_positions:
-                line_pose.position.x = lx
-                line_pose.position.y = ly
-                line_position = self.get_closest_waypoint(line_pose)
-                stop_line_waypoints.append(line_position)
-            # Find the nearest stop line in front of the vehicle.
-            stop_line_idx = np.searchsorted(stop_line_waypoints, [car_position,], side='right')[0]
-            light_wp = stop_line_waypoints[stop_line_idx]
-            # Find the closest visible traffic light (if one exists)
-            light = self.lights[stop_line_idx]
+        stop_line_positions = self.config['stop_line_positions']
+        lx, ly = stop_line_positions[idx]
+        line_pose = Pose()
+        line_pose.position.x = lx
+        line_pose.position.y = ly
+        light_wp = self.get_closest_waypoint(line_pose)
 
         if light:
             state = self.get_light_state(light)
             return light_wp, state
-
-
-        self.waypoints = None
-        return -1, TrafficLight.UNKNOWN
 
 if __name__ == '__main__':
     try:

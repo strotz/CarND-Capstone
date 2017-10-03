@@ -230,7 +230,7 @@ class TLDetector(object):
         """
         if(not self.has_image):
             self.prev_light_loc = None
-            return False
+            return TrafficLight.UNKNOWN
 
         cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
 
@@ -332,8 +332,8 @@ class TLDetector(object):
             return light_wp, state
 
         state = self.get_light_state(light)
+        rospy.logdebug("light is near: %s meters, state: %s", distance_to_stopline, state)
         return light_wp, state
-
 
 
     def distance(self, waypoints, wp1, wp2):

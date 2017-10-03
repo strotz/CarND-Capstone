@@ -62,5 +62,6 @@ class TLClassifier(object):
                 rospy.logdebug('Light is UNKNOWN')
                 return TrafficLight.UNKNOWN
 
-
+        rospy.logwarn("norm is 0")
+        return TrafficLight.UNKNOWN
 

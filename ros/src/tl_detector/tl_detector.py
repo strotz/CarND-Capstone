@@ -259,7 +259,16 @@ class TLDetector(object):
         roi = cv_image[top:bottom,left:right]
 
         # Get classification
-        return self.light_classifier.get_classification(roi)
+        state = self.light_classifier.get_classification(roi)
+        if state == TrafficLight.UNKNOWN:
+            t = rospy.Time.now()
+            filename = 'image%s.png' % (t) 
+            cv2.imwrite(filename, cv_image)
+            filename = 'image%s-roi.png' % (t) 
+            cv2.imwrite(filename, roi)
+            rospy.logdebug("image saved as %s", filename)
+
+        return state
 
 
     def load_stop_line_waypoints(self, waypoints):

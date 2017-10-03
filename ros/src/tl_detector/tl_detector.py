@@ -84,7 +84,6 @@ class TLDetector(object):
             msg (Image): image from car-mounted camera
 
         """
-        self.has_image = True
         self.camera_image = msg
         light_wp, state = self.process_traffic_lights()
 
@@ -175,10 +174,11 @@ class TLDetector(object):
         return (X, Y)
 
 
-    def project_to_image_plane(self, point_in_world):
+    def project_to_image_plane(self, pose, point_in_world):
         """Project point from 3D world coordinates to 2D camera image location
 
         Args:
+            pose (Pose): position and orientation of the car
             point_in_world (Point): 3D location of a point in the world
 
         Returns:
@@ -205,7 +205,7 @@ class TLDetector(object):
             return None
 
         # Use transform and rotation to calculate 2D position of light in image
-        X, Y = TLDetector.to_car_coordinates(self.pose.position, self.pose.orientation, point_in_world)
+        X, Y = TLDetector.to_car_coordinates(pose.position, pose.orientation, point_in_world)
 
         pts = np.array([[X, Y, 0.0]], dtype=np.float32)
         mat = np.array([[fx,  0, image_width / 2],
@@ -218,23 +218,20 @@ class TLDetector(object):
         return (x, y)
 
 
-    def get_light_state(self, light):
+    def get_light_state(self, pose, light):
         """Determines the current color of the traffic light
 
         Args:
+            pose (Pose): position and orientation of the vihicle
             light (TrafficLight): light to classify
 
         Returns:
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
 
         """
-        if(not self.has_image):
-            self.prev_light_loc = None
-            return TrafficLight.UNKNOWN
-
         cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
 
-        pr = self.project_to_image_plane(light.pose.pose.position)
+        pr = self.project_to_image_plane(pose, light.pose.pose.position)
         if pr is None:
             return TrafficLight.UNKNOWN
         x, y = pr
@@ -331,7 +328,7 @@ class TLDetector(object):
             state = light.state
             return light_wp, state
 
-        state = self.get_light_state(light)
+        state = self.get_light_state(pose, light)
         rospy.logdebug("light is near: %s meters, state: %s", distance_to_stopline, state)
         return light_wp, state
 

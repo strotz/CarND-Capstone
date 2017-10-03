@@ -192,49 +192,38 @@ class TLDetector(object):
         trans = None
         try:
             now = rospy.Time.now()
-            self.listener.waitForTransform("/base_link",
-                  "/world", now, rospy.Duration(1.0))
-            (trans, rot) = self.listener.lookupTransform("/base_link",
-                  "/world", now)
-
+            self.listener.waitForTransform("/base_link", "/world", now, rospy.Duration(1.0))
+            (trans, rot) = self.listener.lookupTransform("/base_link", "/world", now)
         except (tf.Exception, tf.LookupException, tf.ConnectivityException):
             rospy.logerr("Failed to find camera to map transform")
 
         #Use tranform and rotation to calculate 2D position of light in image
-	    if (trans != None):
+        if (trans != None):
+            px = point_in_world.x
+            py = point_in_world.y
+            pz = point_in_world.z
+            xt = trans[0]
+            yt = trans[1]
+            zt = trans[2]
 
-		    #print("rot: ", rot)
-	    	#print("trans: ", trans)
-	    	px = point_in_world.x
-	    	py = point_in_world.y
-	    	pz = point_in_world.z
-	    	xt = trans[0]
-	    	yt = trans[1]
-	    	zt = trans[2]
-	    	
             #Override focal lengths with data from site for testing
-	    	#fx = 1345.200806
-	    	#fy = 1353.838257 
+            #fx = 1345.200806
+            #fy = 1353.838257 
 
-	    	#Convert rotation vector from quaternion to euler:
-	    	euler = tf.transformations.euler_from_quaternion(rot)
-	    	sinyaw = math.sin(euler[2])
-	    	cosyaw = math.cos(euler[2])
+            #Convert rotation vector from quaternion to euler:
+            euler = tf.transformations.euler_from_quaternion(rot)
+            sinyaw = math.sin(euler[2])
+            cosyaw = math.cos(euler[2])
 
             #Rotation followed by translation
-		    Rnt = (
-			    px*cosyaw - py*sinyaw + xt,
-			    px*sinyaw + py*cosyaw + yt,
-			    pz + zt)   
+            Rnt = (px*cosyaw - py*sinyaw + xt, px*sinyaw + py*cosyaw + yt, pz + zt)   
 
-		    #Pinhole camera model w/o distorion
-        	u = int(fx * -Rnt[1]/Rnt[0] + image_width/2)
-        	v = int(fy * -Rnt[2]/Rnt[0] + image_height/2)
-		    #print("u: ", u)
-		    #print("v: ", v)
-	    else:
-		    u = 0
-		    v = 0
+            #Pinhole camera model w/o distorion
+            u = int(fx * -Rnt[1]/Rnt[0] + image_width/2)
+            v = int(fy * -Rnt[2]/Rnt[0] + image_height/2)
+        else:
+            u = 0
+            v = 0
 
         return (u, v)
 
@@ -284,7 +273,7 @@ class TLDetector(object):
         cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
 
         # pr = self.project_to_image_plane(pose, light.pose.pose.position)
-        pr = self.project_to_image_plane1(light.pose.pose.position)
+        pr = self.project_to_image_plane_1(light.pose.pose.position)
         if pr is None:
             return TrafficLight.UNKNOWN
         x, y = pr

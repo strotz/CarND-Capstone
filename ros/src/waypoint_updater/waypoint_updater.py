@@ -33,7 +33,6 @@ class WaypointUpdater(object):
         rospy.init_node('waypoint_updater', log_level=rospy.DEBUG)
 
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
-        rospy.Subscriber('/current_velocity', TwistStamped, self.current_velocity_cb)
 
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
         rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
@@ -41,11 +40,9 @@ class WaypointUpdater(object):
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
         self.latest_waypoints = None
-
         self.latest_pose = None
-        self.current_velocity = 0 # TODO: not a best way 
-        
-        self.redlight_wp = -1
+        self.latest_pose_timestamp = None
+        self.stop_line_wp = -1
 
         self.loop()
 
@@ -61,17 +58,14 @@ class WaypointUpdater(object):
 
     def pose_cb(self, msg):
         self.latest_pose = msg.pose
-
-    def current_velocity_cb(self, msg):
-        self.current_velocity = msg.twist.linear.x
-
+        self.latest_pose_timestamp = msg.header.stamp
 
     def waypoints_cb(self, lane):
         rospy.logdebug("total base waypoints %s", len(lane.waypoints))
         self.latest_waypoints = lane.waypoints        
 
     def traffic_cb(self, msg):
-        self.redlight_wp = msg.data
+        self.stop_line_wp = msg.data
 
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
@@ -92,30 +86,32 @@ class WaypointUpdater(object):
             send.append(waypoints[ 0 : (LOOKAHEAD_WPS - tail)])
 
         # Slow down if there is a red light in front
-        redlight_wp = self.redlight_wp
-        current_velocity = self.current_velocity
-
-        if redlight_wp >= 0: # redlight detected ahead
-            distance_to_red_light = self.distance(waypoints, closest_wp, redlight_wp) # in meters
-            # rospy.logdebug("current speed %s light %s stop %s", current_velocity, distance_to_red_light, distance_to_stop)
+        stop_line_wp = self.stop_line_wp
+        current_velocity = self.get_waypoint_velocity(send[0])
+ 
+        if stop_line_wp >= 0: # redlight detected ahead
+            distance_to_red_light = self.distance(waypoints, closest_wp, stop_line_wp) # in meters
+            rospy.logdebug("RUN: current velocity %s light %s", current_velocity, distance_to_red_light)
 
             # TODO: it is better to use current velocity and deccelatarion to calculate smoother profile
             SLOW_DISTANCE = 15
             STOP_DISTANCE = 1 
             if distance_to_red_light <= STOP_DISTANCE: 
-                rospy.logdebug("STOP from %s", current_velocity)
+                rospy.logdebug("RUN: STOP from %s", current_velocity)
                 send = self.build_stop_profile(send)
             elif distance_to_red_light < SLOW_DISTANCE:
-                rospy.logdebug("SLOW from %s", current_velocity)                
-                target_wp = self.how_many_ahead(closest_wp, redlight_wp, len(waypoints))
+                rospy.logdebug("RUN: SLOW from %s", current_velocity)                
+                target_wp = self.how_many_ahead(closest_wp, stop_line_wp, len(waypoints))
                 send = self.build_slowdown_profile(send, current_velocity, min(target_wp,LOOKAHEAD_WPS))    
             else:
-                rospy.logdebug("KEEP (*)")
+                rospy.logdebug("RUN: KEEP (*)")
                 send = self.build_keepspeed_profile(send, MAX_SPEED)                
 
         else:
-            rospy.logdebug("KEEP")
+            rospy.logdebug("RUN: KEEP")
             send = self.build_keepspeed_profile(send, MAX_SPEED)
+        
+        rospy.logdebug("RUN: send[0]=%s", self.get_waypoint_velocity(send[0]))
 
         # publish data
         lane = Lane()

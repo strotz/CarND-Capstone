@@ -29,7 +29,7 @@ LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this n
 
 class WaypointUpdater(object):
     def __init__(self):
-        rospy.init_node('waypoint_updater', log_level=rospy.DEBUG)
+        rospy.init_node('waypoint_updater', log_level=rospy.INFO)
 
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
 
@@ -94,20 +94,17 @@ class WaypointUpdater(object):
  
         if stop_line_wp >= 0: # redlight detected ahead
             distance_to_red_light = self.distance(waypoints, closest_wp, stop_line_wp) # in meters
-            rospy.logdebug("RUN: current velocity %s light %s", current_velocity, distance_to_red_light)
 
-            # TODO: it is better to use current velocity and deccelatarion to calculate smoother profile
-            SLOW_DISTANCE = 15
-            STOP_DISTANCE = 1 
+            SLOW_DISTANCE = 20
+            STOP_DISTANCE = 3 
             if distance_to_red_light <= STOP_DISTANCE: 
-                rospy.logdebug("RUN: STOP from %s", current_velocity)
+                rospy.loginfo("RUN: STOP distance to light %s", distance_to_red_light)
                 send = self.build_stop_profile(send)
             elif distance_to_red_light < SLOW_DISTANCE:
-                rospy.logdebug("RUN: SLOW from %s", current_velocity)                
-                target_wp = self.how_many_ahead(closest_wp, stop_line_wp, len(waypoints))
-                send = self.build_slowdown_profile(send, current_velocity, min(target_wp,LOOKAHEAD_WPS))    
+                rospy.loginfo("RUN: SLOW distance to light %s", distance_to_red_light)                
+                send = self.build_slowdown_profile(send, distance_to_red_light, SLOW_DISTANCE, STOP_DISTANCE, MAX_SPEED)    
             else:
-                rospy.logdebug("RUN: KEEP (*)")
+                rospy.logdebug("RUN: KEEP distance to light %s", distance_to_red_light)
                 send = self.build_keepspeed_profile(send, MAX_SPEED)                
 
         else:
@@ -128,16 +125,26 @@ class WaypointUpdater(object):
             self.set_waypoint_velocity(waypoints, i, 0.0)
         return waypoints
 
-    # TODO: it need to keep moving car until it reaches target
-    def build_slowdown_profile(self, waypoints, current_velocity, target_wp):
-        dv = -current_velocity / target_wp if target_wp > 0.005 else 0
-        for i in range(len(waypoints)):
-            if (i < target_wp):
-                v = current_velocity + dv * i
+    # it keeps moving car until it reaches target
+    def build_slowdown_profile(self, send, distance_to_red_light, SLOW_DISTANCE, STOP_DISTANCE, MAX_SPEED):
+        way_to_go = distance_to_red_light
+        dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
+        for i in range(0, len(send)):
+            if way_to_go >= SLOW_DISTANCE: # it should not happend
+                self.set_waypoint_velocity(send, i, MAX_SPEED) 
+            elif way_to_go > STOP_DISTANCE:
+                a = (way_to_go - STOP_DISTANCE) / (SLOW_DISTANCE - STOP_DISTANCE) # between 0 and 1
+                v = a * a * MAX_SPEED # quadratic
+                self.set_waypoint_velocity(send, i, v)
             else:
-                v = 0.0
-            self.set_waypoint_velocity(waypoints, i, 0.0)
-        return waypoints
+                self.set_waypoint_velocity(send, i, 0.0)
+
+            if i < (len(send) - 1): # we can do it because it prepares way_to_go for next iteration
+                dist = dl(send[i].pose.pose.position, send[i + 1].pose.pose.position)
+            way_to_go -= dist
+
+        return send
+
 
     def build_keepspeed_profile(self, waypoints, target_velocity):
         for i in range(len(waypoints)):

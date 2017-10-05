@@ -26,7 +26,6 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
 LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
-MAX_SPEED = 20 * 0.447
 
 class WaypointUpdater(object):
     def __init__(self):
@@ -84,6 +83,10 @@ class WaypointUpdater(object):
         send = waypoints[ closest_wp : closest_wp + min(LOOKAHEAD_WPS, tail) ]
         if tail < LOOKAHEAD_WPS:
             send.append(waypoints[ 0 : (LOOKAHEAD_WPS - tail)])
+
+        # ensure that we are not changing original waypoints
+        MAX_SPEED=self.get_waypoint_velocity(send[0])
+        send = copy.deepcopy(send)
 
         # Slow down if there is a red light in front
         stop_line_wp = self.stop_line_wp

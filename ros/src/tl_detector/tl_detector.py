@@ -182,15 +182,9 @@ class TLDetector(object):
             x (int): x coordinate of target point in image
             y (int): y coordinate of target point in image
         """
-
-        fx = self.config['camera_info']['focal_length_x']
-        fy = self.config['camera_info']['focal_length_y']
-        if fx is None:
-            fx = 1.0
-
-        if fy is None:
-            fy = 1.0    
-
+        ci = self.config['camera_info']
+        fx = ci['focal_length_x'] if 'focal_length_x' in ci else 1.0
+        fy = ci['focal_length_y'] if 'focal_length_y' in ci else 1.0
 
         image_width = self.config['camera_info']['image_width']
         image_height = self.config['camera_info']['image_height']

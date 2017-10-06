@@ -95,7 +95,7 @@ class WaypointUpdater(object):
         if stop_line_wp >= 0: # redlight detected ahead
             distance_to_red_light = self.distance(waypoints, closest_wp, stop_line_wp) # in meters
 
-            SLOW_DISTANCE = 20
+            SLOW_DISTANCE = 30
             STOP_DISTANCE = 3 
             if distance_to_red_light <= STOP_DISTANCE: 
                 rospy.loginfo("RUN: STOP distance to light %s", distance_to_red_light)

@@ -318,7 +318,7 @@ class TLDetector(object):
         light_wp = stop_line_waypoints[stop_line_idx] # index of waypoint associated with stop line, first part of the result
         
         distance_to_stopline = self.distance(waypoints, car_position_wp, light_wp)
-        MAX_DIST = 80  # meters
+        MAX_DIST = 50  # meters
         if distance_to_stopline > MAX_DIST:
             rospy.logdebug("light is too far: %s meters", distance_to_stopline)
             return -1, TrafficLight.UNKNOWN

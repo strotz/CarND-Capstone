@@ -19,7 +19,7 @@ class Controller(object):
         self.max_lat_accel = args[8]
         self.max_steer_angle = args[9]
 
-        self.pid_throttle = PID(1.5, 0.005, 0.0, self.decel_limit, self.accel_limit)
+        self.pid_throttle = PID(1.5, 0.25, 0.1, self.decel_limit, self.accel_limit)
         self.yaw_controller = YawController(self.wheel_base, self.steer_ratio, 0.0, self.max_lat_accel, self.max_steer_angle)
 
     def control(self, *args, **kwargs):

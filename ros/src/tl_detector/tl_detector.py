@@ -260,7 +260,8 @@ class TLDetector(object):
 
         # Get classification
         state = self.light_classifier.get_classification(roi)
-        if state == TrafficLight.UNKNOWN:
+        dump_unknown_images = False
+        if state == TrafficLight.UNKNOWN and dump_unknown_images:
             t = rospy.Time.now()
             filename = 'image%s.png' % (t) 
             cv2.imwrite(filename, cv_image)

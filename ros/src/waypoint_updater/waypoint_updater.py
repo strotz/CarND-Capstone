@@ -77,12 +77,11 @@ class WaypointUpdater(object):
             rospy.logwarn('no waypoints found ahead of car')
             return
   
-        # rospy.logdebug("closest next waypoint is %s", closest_wp)
-
-        tail = len(waypoints) - closest_wp
-        send = waypoints[ closest_wp : closest_wp + min(LOOKAHEAD_WPS, tail) ]
+        tail = len(waypoints) - closest_wp 
+        send = waypoints[closest_wp:closest_wp + min(LOOKAHEAD_WPS, tail)]
         if tail < LOOKAHEAD_WPS:
-            send.append(waypoints[ 0 : (LOOKAHEAD_WPS - tail)])
+            rospy.loginfo("TAIL: closest next waypoint is %s", closest_wp)
+            send.append(waypoints[0:(LOOKAHEAD_WPS-tail)])
 
         # ensure that we are not changing original waypoints
         MAX_SPEED=self.get_waypoint_velocity(send[0])
@@ -95,7 +94,7 @@ class WaypointUpdater(object):
         if stop_line_wp >= 0: # redlight detected ahead
             distance_to_red_light = self.distance(waypoints, closest_wp, stop_line_wp) # in meters
 
-            MARGIN = 20
+            MARGIN = 25
             SLOW_DISTANCE = 25
             STOP_DISTANCE = 3 
             if distance_to_red_light <= STOP_DISTANCE: 
@@ -146,11 +145,10 @@ class WaypointUpdater(object):
 
         return send
 
-
-    def build_keepspeed_profile(self, waypoints, target_velocity):
-        for i in range(len(waypoints)):
-            self.set_waypoint_velocity(waypoints, i, target_velocity)
-        return waypoints
+    def build_keepspeed_profile(self, send, target_velocity):
+        for i in range(len(send)):
+            self.set_waypoint_velocity(send, i, target_velocity)
+        return send
 
     def find_next_waypoint(self, pose, waypoints):
         closest = -1

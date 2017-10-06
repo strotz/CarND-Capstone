@@ -185,6 +185,13 @@ class TLDetector(object):
 
         fx = self.config['camera_info']['focal_length_x']
         fy = self.config['camera_info']['focal_length_y']
+        if fx is None:
+            fx = 1.0
+
+        if fy is None:
+            fy = 1.0    
+
+
         image_width = self.config['camera_info']['image_width']
         image_height = self.config['camera_info']['image_height']
 
@@ -200,10 +207,6 @@ class TLDetector(object):
         yt = camera_position.y
         zt = camera_position.z
 
-        #Override focal lengths with data from site for testing
-        #fx = 1345.200806
-        #fy = 1353.838257 
-
         #Convert rotation vector from quaternion to euler:
         roll, pitch, camera_yaw = euler_from_quaternion([camera_orientation.x, camera_orientation.y, camera_orientation.z, camera_orientation.w])
         sin_yaw = math.sin(camera_yaw)
@@ -217,38 +220,6 @@ class TLDetector(object):
         v = int(fy * -Rnt[2]/Rnt[0] + image_height/2)
      
         return (u, v)
-
-    def project_to_image_plane(self, pose, point_in_world):
-        """Project point from 3D world coordinates to 2D camera image location
-
-        Args:
-            pose (Pose): position and orientation of the car
-            point_in_world (Point): 3D location of a point in the world
-
-        Returns:
-            x (int): x coordinate of target point in image
-            y (int): y coordinate of target point in image
-
-        """
-
-        fx = self.config['camera_info']['focal_length_x']
-        fy = self.config['camera_info']['focal_length_y']
-        image_width = self.config['camera_info']['image_width']
-        image_height = self.config['camera_info']['image_height']
-      
-        # Use transform and rotation to calculate 2D position of light in image
-        X, Y = TLDetector.to_car_coordinates(pose.position, pose.orientation, point_in_world)
-
-        pts = np.array([[X, Y, 0.0]], dtype=np.float32)
-        mat = np.array([[fx,  0, image_width / 2],
-                        [ 0, fy, image_height / 2],
-                        [ 0,  0,  1]], dtype=np.float32)
-        proj, d = cv2.projectPoints(pts, (0,0,0), (0,0,0), mat, None)
-
-        x = int(proj[0,0,0])
-        y = int(proj[0,0,1])
-        return (x, y)
-
 
     def get_light_state(self, pose, light):
         """Determines the current color of the traffic light

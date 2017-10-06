@@ -316,6 +316,8 @@ class TLDetector(object):
 
         # Find the nearest stop line in front of the vehicle.
         stop_line_idx = np.searchsorted(stop_line_waypoints, [car_position_wp,], side='right')[0]
+        if stop_line_idx == len(stop_line_waypoints):
+            stop_line_idx = 0
         light_wp = stop_line_waypoints[stop_line_idx] # index of waypoint associated with stop line, first part of the result
         
         distance_to_stopline = self.distance(waypoints, car_position_wp, light_wp)

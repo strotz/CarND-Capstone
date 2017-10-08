@@ -2,8 +2,29 @@
 
 ### Team
 
+Alexei Strots (strotz@gmail.com)  
+Ilya Gerasimets (ilya.gerasimets@gmail.com)  
+Barney Kim (illumine03@naver.com)  
 
+### Objective
 
+To gain experience with ROS (Robot Operating System) and ROS modules development. Implement system that controls vehicle steering wheel, acceleration and brakes. Ensure that car can follow the route defined by set of waypoints; can detect state of traffic light from provided camera images; maintain desired velocity and stop when there is a red traffic light ahead.
+
+### Overview 
+
+There are 3 ROS modules modified: 
+
+* **waypoint_updater** - module that receive list of map waypoints, upcoming traffic light info and current position and orientation of the car. The goal of this module is to generate short list of waypoints ahead of the car that will be used for short term trajectory calculation. Also this module enriches waypoints with linear velocity information.  It order to do it, module contains builders of various speed profiles (stop, run, slow down)  
+
+* **tl_detector** - module responsible for localization of upcoming traffic light and detection of its state. It receives list of waypoints and current vehicle position and orientation, position of traffic lights on the map and image from camera. It uses this information to calculate position of stop line before traffic light, precise position of the light in image and control classifier that detects state of traffic light.
+
+* **twist_controller** - module that translates desired vehicle's linear and angular velocity to throttle, brake and steering signals. It implements PID and yaw controllers.
+
+### Waypoint Updater
+ 
+### Traffic Light Detector
+ 
+### Twist Controller 
 
 # Content from Udacity:
 

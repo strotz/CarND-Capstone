@@ -21,6 +21,19 @@ There are 3 ROS modules modified:
 * **twist_controller** - module that translates desired vehicle's linear and angular velocity to throttle, brake and steering signals. It implements PID and yaw controllers.
 
 ### Waypoint Updater
+
+waypoint_updater.py contains implementation of module that builds motion and speed profile for the vehicle based on its current position and surroundings. As a first step we have to find nearest waypoint in front of the vehicle. In order to do it, we looped through all waypoints and first, filtered out items that has negative correlation between car orientation and vector drown from car to waypoint. Then, we found one that has min distance to vehicle current position (square root operation is omitted for performance reason). Same approach we used in traffic light detector to find closest light in front of he car.
+
+Assuming that waypoints in complete map ordered to maintain desired direction, we copied next N elements and dealt with fact that map has ring nature, i.e. when there are not enough elements in tail of source array, read the required elements from the beginning.
+
+Then we need to generate velocity profile. We use data from "/traffic_waypoint" channel to calculate distance to stop line of red or yellow traffic light. Originally, we used simple rule to assign speed to MAX when there is no red signal ahead and 0 if the is one in close proximity. Then PID controlled dealt with large acceleration and jerk. Later, we added "slow down" profile that gradually decreases velocity, based on distance to stop line. Linear decrease was not enough sometimes to stop the car, so we switch to paraboloid descent.
+
+```
+a = (way_to_go - STOP_DISTANCE) / (SLOW_DISTANCE - STOP_DISTANCE) # between 0 and 1
+v = a * a * MAX_SPEED # x^2
+```
+ 
+It would be nice to be able to use data from "/current_velocity" in this module. Such data can open posibilities to generate better predictions and exact speed profiles. Yet, site bag does not contain this signal and it limits funtionality of this module.
  
 ### Traffic Light Detector
  

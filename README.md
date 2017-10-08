@@ -24,7 +24,25 @@ There are 3 ROS modules modified:
  
 ### Traffic Light Detector
  
-### Twist Controller 
+### Twist Controller
+
+twist_controller.py file contains a stub of the Controller class. We implemented the control method to return throttle, brake, and steering values. We have also added a reset method to prevent the PID controller from accumulating errors when the safety driver is taken over.
+
+The throttle of the car was calculated based on the current velocity and the target velocity. A generic PID controller in pid.py was used for error correction. After several trial and error and tuning, the PID controller used the following parameters.
+```
+kp = 6.0
+ki = 0.25
+kd = 0.4
+```
+
+The brake torque is based on multiple parameters. Vehicle acceleration, as well as mass of the vehicle, weight of fuel, radius of the wheel, and other values have been considered. The brake torque is in N/m and the formulae used for calculting the brake is as follows.
+```
+total_mass = vehicle_mass + fuel_capacity * GAS_DENSITY
+longitudinal_force = total_mass * acceleration
+brake_torque = longitudinal_force * wheel_radius
+```
+
+Finally, the steering angle was calculated based on the current linear velocity and the target linear and angular velocity. The YawController in yaw_controller.py was used to convert target linear and angular velocity to steering commands.
 
 # Content from Udacity:
 

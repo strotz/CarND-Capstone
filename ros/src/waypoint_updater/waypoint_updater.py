@@ -80,8 +80,9 @@ class WaypointUpdater(object):
         tail = len(waypoints) - closest_wp 
         send = waypoints[closest_wp:closest_wp + min(LOOKAHEAD_WPS, tail)]
         if tail < LOOKAHEAD_WPS:
-            rospy.loginfo("TAIL: closest next waypoint is %s", closest_wp)
-            send.append(waypoints[0:(LOOKAHEAD_WPS-tail)])
+            rospy.logdebug("TAIL: closest next waypoint: %s, total: %s send: %s", closest_wp, len(waypoints), len(send))
+            rospy.logdebug("TAIL: need to fill %s", LOOKAHEAD_WPS-tail)
+            send.extend(waypoints[0:(LOOKAHEAD_WPS-tail)])
 
         # ensure that we are not changing original waypoints
         MAX_SPEED=self.get_waypoint_velocity(send[0])

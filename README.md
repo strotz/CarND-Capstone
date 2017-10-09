@@ -36,6 +36,39 @@ v = a * a * MAX_SPEED # x^2
 It would be nice to be able to use data from "/current_velocity" in this module. Such data can open posibilities to generate better predictions and exact speed profiles. Yet, site bag does not contain this signal and it limits funtionality of this module.
  
 ### Traffic Light Detector
+
+tl_detector.py contains implentation of algorithms which decides if a traffic light is close enough, cuts region of interest (ROI() from the image, calls classifier, and reports upcoming traffic light state.
+
+It has the following methods:
+
+- 'get_closest_waypoint' identifies the closest path waypoint to the given position;
+- 'to_car_coordinates' converts a world coordinate point to car coordinate system (to find ROI of a traffic light);
+- 'project_to_image_plane_1' projects point from 3D world coordinates to 2D camera image location;
+- 'get_light_state' gets a camera image, cuts ROI, and sends it to classifier;
+- 'load_stop_line_waypoints' stop line waypoints from config;
+- 'process_traffic_lights' contains core algorithm which
+1) finds traffic light closest to the car (and in front of it);
+2) decides if it is too far or not (the limit is 70 meters);
+3) finds correct coordinate transformation to build ROI;
+4) sends ROI for classification;
+5) reports the traffic light state to the caller.
+
+tl_classifier.py contains implementation of traffic light classifier (method get_classification). It uses computer vision library OpenCV to analyze incoming images and decide if there is a traffice ligth and what it's color.
+
+The algorithm works as following:
+
+- the input parameter is a part of the image presumably containing a traffic light (Region Of Interest);
+- validates the incoming image (line 23);
+- converts the image to grayscale, inverts it, and removes too bright components (lines 27-28);
+- searches for the large objects on the image using OpenCV 'findContours' algorithm (line 30);
+- from all contours it keeps only a few largest with size at least 1% of original image but no more than 20% (lines 32-36);
+- uses the contours (as a mask) to crop the original imagel (lines 38-40);
+- extracts color information from the original image by building histograms (lines 42-44);
+- makes dicision as following (lines 46-63):
+1) if the bright areas of histogram contain green (at least 40%) and red (at least 40%) - it is yellow;
+2) if the bright areas of histogram contain at least 50% red - it is red;
+3) if the bright areas of histogram contain at least 50% green - it is green;
+4) otherwise the color is unknown.
  
 ### Twist Controller
 

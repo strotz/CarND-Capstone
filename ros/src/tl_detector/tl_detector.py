@@ -173,7 +173,7 @@ class TLDetector(object):
 
         return (X, Y)
 
-
+    # originally posted on udacity forum, adjusted to use current_pose
     def project_to_image_plane_1(self, pose, point_in_world):
         """Project point from 3D world coordinates to 2D camera image location
         Args:

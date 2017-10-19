@@ -47,7 +47,7 @@ class TLDetector(object):
         # config file load
         config_string = rospy.get_param("/traffic_light_config")
         self.config = yaml.load(config_string)
-        
+
         ci = self.config['camera_info']
         self.fx = ci['focal_length_x'] if 'focal_length_x' in ci else 1.0
         self.fy = ci['focal_length_y'] if 'focal_length_y' in ci else 1.0
@@ -179,42 +179,6 @@ class TLDetector(object):
 
         return (X, Y)
 
-    # originally posted on udacity forum, adjusted to use current_pose
-    def project_to_image_plane_1(self, pose, point_in_world):
-        """Project point from 3D world coordinates to 2D camera image location
-        Args:
-            point_in_world (Point): 3D location of a point in the world
-        Returns:
-            x (int): x coordinate of target point in image
-            y (int): y coordinate of target point in image
-        """
-
-        # get transform between pose of camera and world frame
-        camera_position = pose.position
-        camera_orientation = pose.orientation
-
-        px = point_in_world.x
-        py = point_in_world.y
-        pz = point_in_world.z
-        
-        xt = camera_position.x
-        yt = camera_position.y
-        zt = camera_position.z
-
-        #Convert rotation vector from quaternion to euler:
-        roll, pitch, camera_yaw = euler_from_quaternion([camera_orientation.x, camera_orientation.y, camera_orientation.z, camera_orientation.w])
-        sin_yaw = math.sin(camera_yaw)
-        cos_yaw = math.cos(camera_yaw)
-
-        #Rotation followed by translation
-        Rnt = (px*cos_yaw - py*sin_yaw + xt, px*sin_yaw + py*cos_yaw + yt, pz + zt)   
-
-        #Pinhole camera model w/o distorion
-        u = int(self.fx * -Rnt[1]/Rnt[0] + self.image_width/2)
-        v = int(self.fy * -Rnt[2]/Rnt[0] + self.image_height/2)
-     
-        return (u, v)
-
     def get_light_state(self, pose, light):
         """Determines the current color of the traffic light
 
@@ -226,27 +190,47 @@ class TLDetector(object):
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
 
         """
-        cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
 
-        # pr = self.project_to_image_plane(pose, light.pose.pose.position)
-        pr = self.project_to_image_plane_1(pose, light.pose.pose.position)
-        if pr is None:
+        X, Y = TLDetector.to_car_coordinates(pose.position, pose.orientation, light.pose.pose.position)
+        if X < 3:
+            rospy.logdebug("light is to close or back from the camera: %s", X)
             return TrafficLight.UNKNOWN
-        x, y = pr
 
-        # use light location to zoom in on traffic light in image
+        camera_position = pose.position
+        camera_orientation = pose.orientation
+        roll, pitch, camera_yaw = euler_from_quaternion([camera_orientation.x, camera_orientation.y, camera_orientation.z, camera_orientation.w])
+
+        # calculation of X and Y already uses camera_yaw
+        pos_x = self.image_width / 2 - int(self.fx * Y / X)
+
+        camera_z = camera_position.z
+        adjustment_for_roll = math.tan(roll) * X
+
+        light_z = light.pose.pose.position.z
+        pos_y = self.image_height /2 + int(self.fy * (light_z - camera_z - adjustment_for_roll) / X)
+        rospy.logdebug("light coordinates at image: %s, %s", pos_x, pos_y)
+        
+        if pos_x < 0 or pos_x > self.image_width:
+            rospy.logdebug("light x is out of view: %s", pos_x)
+            return TrafficLight.UNKNOWN
+
+        if pos_y < 0 or pos_y > self.image_height:
+            rospy.logdebug("light y is out of view: %s", pos_y)
+            return TrafficLight.UNKNOWN
+
+        # # use light location to zoom in on traffic light in image
         lw = int(self.image_width / 4)
-        lh = int(self.image_height / 3)
+        lh = int(self.image_height / 4)
 
-        top = int(y - lh)
-        bottom = int(y + lh)
-        left = int(x - lw)
-        right = int(x + lw)
+        cv_y = self.image_height - pos_y
+        top = max(cv_y - lh, 0)
+        bottom = min(cv_y + lh, self.image_height)
 
-        if top < 0 or bottom > self.image_height or left < 0 or right > self.image_width:
-            rospy.logdebug('Invalid ROI: ' + str(top) + ', ' + str(bottom) + ', ' + str(left) + ', ' + str(right))
-            return TrafficLight.UNKNOWN
+        left = max(pos_x - lw, 0)
+        right = min(pos_x + lw, self.image_width)
 
+        # select part of the image
+        cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
         roi = cv_image[top:bottom,left:right]
 
         # Get classification
@@ -258,8 +242,9 @@ class TLDetector(object):
             cv2.imwrite(filename, cv_image)
             filename = 'image%s-roi.png' % (t) 
             cv2.imwrite(filename, roi)
-            rospy.logdebug("image saved as %s", filename)
+            rospy.loginfo("image %s ROI at %s, %s", t, pos_x, pos_y)
 
+        rospy.logdebug("state: %s", state)
         return state
 
 
@@ -325,18 +310,13 @@ class TLDetector(object):
             return -1, TrafficLight.UNKNOWN
         light = lights[light_index]
 
-        X, Y = TLDetector.to_car_coordinates(pose.position, pose.orientation, light.pose.pose.position)
-        if X < 5:
-            rospy.logdebug('light is back from the car')
-            return -1, TrafficLight.UNKNOWN
-
         use_simulated_red = False
         if use_simulated_red: # this branch will work with simulator
             state = light.state
             return light_wp, state
 
         state = self.get_light_state(pose, light)
-        rospy.logdebug("light is near: %s meters, state: %s", distance_to_stopline, state)
+        # rospy.logdebug("light is near: %s meters, state: %s", distance_to_stopline, state)
         return light_wp, state
 
 

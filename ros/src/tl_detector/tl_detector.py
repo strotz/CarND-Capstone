@@ -24,13 +24,11 @@ class TLDetector(object):
     def __init__(self):
         rospy.init_node('tl_detector', log_level=rospy.INFO)
 
+        # data initialization
         self.pose = None
-        
         self.latest_waypoints = None
         self.stop_line_waypoints = None # indexes of waypoints associated with stop lines
-
         self.camera_image = None
-        
         self.lights = None
 
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
@@ -46,8 +44,16 @@ class TLDetector(object):
         sub3 = rospy.Subscriber('/vehicle/traffic_lights', TrafficLightArray, self.traffic_cb)
         sub6 = rospy.Subscriber('/image_color', Image, self.image_cb)
 
+        # config file load
         config_string = rospy.get_param("/traffic_light_config")
         self.config = yaml.load(config_string)
+        
+        ci = self.config['camera_info']
+        self.fx = ci['focal_length_x'] if 'focal_length_x' in ci else 1.0
+        self.fy = ci['focal_length_y'] if 'focal_length_y' in ci else 1.0
+        self.image_width = self.config['camera_info']['image_width']
+        self.image_height = self.config['camera_info']['image_height']
+        rospy.loginfo("Camera image dimentions: %sx%s", self.image_width, self.image_height)
 
         self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
 
@@ -182,12 +188,6 @@ class TLDetector(object):
             x (int): x coordinate of target point in image
             y (int): y coordinate of target point in image
         """
-        ci = self.config['camera_info']
-        fx = ci['focal_length_x'] if 'focal_length_x' in ci else 1.0
-        fy = ci['focal_length_y'] if 'focal_length_y' in ci else 1.0
-
-        image_width = self.config['camera_info']['image_width']
-        image_height = self.config['camera_info']['image_height']
 
         # get transform between pose of camera and world frame
         camera_position = pose.position
@@ -210,8 +210,8 @@ class TLDetector(object):
         Rnt = (px*cos_yaw - py*sin_yaw + xt, px*sin_yaw + py*cos_yaw + yt, pz + zt)   
 
         #Pinhole camera model w/o distorion
-        u = int(fx * -Rnt[1]/Rnt[0] + image_width/2)
-        v = int(fy * -Rnt[2]/Rnt[0] + image_height/2)
+        u = int(self.fx * -Rnt[1]/Rnt[0] + self.image_width/2)
+        v = int(self.fy * -Rnt[2]/Rnt[0] + self.image_height/2)
      
         return (u, v)
 
@@ -235,18 +235,15 @@ class TLDetector(object):
         x, y = pr
 
         # use light location to zoom in on traffic light in image
-        image_width = self.config['camera_info']['image_width']
-        image_height = self.config['camera_info']['image_height']
-
-        lw = int(image_width / 4)
-        lh = int(image_height / 3)
+        lw = int(self.image_width / 4)
+        lh = int(self.image_height / 3)
 
         top = int(y - lh)
         bottom = int(y + lh)
         left = int(x - lw)
         right = int(x + lw)
 
-        if top < 0 or bottom > image_height or left < 0 or right > image_width:
+        if top < 0 or bottom > self.image_height or left < 0 or right > self.image_width:
             rospy.logdebug('Invalid ROI: ' + str(top) + ', ' + str(bottom) + ', ' + str(left) + ', ' + str(right))
             return TrafficLight.UNKNOWN
 

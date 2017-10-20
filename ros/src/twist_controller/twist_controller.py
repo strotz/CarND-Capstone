@@ -17,7 +17,7 @@ class Controller(object):
         self.wheel_radius = args[5]
         self.wheel_base = args[6]
         self.steer_ratio = args[7]
-        self.max_lat_acceleration = args[8]
+        self.max_lat_accel = args[8]
         self.max_steer_angle = args[9]
 
         self.pid_throttle = PID(1.5, 0.001, 0., self.decel_limit, self.accel_limit)

@@ -44,6 +44,8 @@ class TLDetector(object):
         sub3 = rospy.Subscriber('/vehicle/traffic_lights', TrafficLightArray, self.traffic_cb)
         sub6 = rospy.Subscriber('/image_color', Image, self.image_cb)
 
+        self.image_pub = rospy.Publisher('/image_tl_select', Image, queue_size=1)
+
         # config file load
         config_string = rospy.get_param("/traffic_light_config")
         self.config = yaml.load(config_string)
@@ -232,6 +234,9 @@ class TLDetector(object):
         # select part of the image
         cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
         roi = cv_image[top:bottom,left:right]
+
+        # 
+        self.image_pub.publish(self.bridge.cv2_to_imgmsg(roi, "bgr8"))
 
         # Get classification
         state = self.light_classifier.get_classification(roi)

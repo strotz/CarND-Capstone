@@ -1,6 +1,7 @@
 import math
 from pid import PID
 from yaw_controller import YawController
+from lowpass import LowPassFilter
 
 GAS_DENSITY = 2.858
 ONE_MPH = 0.44704
@@ -19,8 +20,9 @@ class Controller(object):
         self.max_lat_accel = args[8]
         self.max_steer_angle = args[9]
 
-        self.pid_throttle = PID(6.0, 0.25, 0.4, self.decel_limit, self.accel_limit)
+        self.pid_throttle = PID(1.5, 0.001, 0., self.decel_limit, self.accel_limit)
         self.yaw_controller = YawController(self.wheel_base, self.steer_ratio, 0.0, self.max_lat_accel, self.max_steer_angle)
+        self.lp_filter = LowPassFilter(4., 1.)
 
     def control(self, *args, **kwargs):
         proposed_linear_velocity = args[0]
@@ -30,6 +32,7 @@ class Controller(object):
 
         velocity_error = proposed_linear_velocity - current_linear_velocity
         accel = self.pid_throttle.step(velocity_error, dt)
+        accel = self.lp_filter.filt(accel)
 
         steer = self.yaw_controller.get_steering(proposed_linear_velocity, proposed_angular_velocity, current_linear_velocity)
 

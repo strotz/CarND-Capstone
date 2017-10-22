@@ -17,6 +17,15 @@ import scipy.misc
 
 from tf.transformations import euler_from_quaternion
 
+def fit_box(total, pos, box):
+    margin = int(box / 2)
+    if pos < margin:
+        return 0, box
+    if pos > (total - margin):
+        return total - box, total
+
+    return pos - margin, pos + margin
+
 
 STATE_COUNT_THRESHOLD = 3
 
@@ -67,6 +76,9 @@ class TLDetector(object):
         self.last_state = TrafficLight.UNKNOWN
         self.last_wp = -1
         self.state_count = 0
+
+        # to collect pictures
+        self.dump_count = 0
 
         rospy.spin()
 
@@ -220,26 +232,20 @@ class TLDetector(object):
             rospy.logdebug("light y is out of view: %s", pos_y)
             return TrafficLight.UNKNOWN
 
-        # # use light location to zoom in on traffic light in image
-        lw = int(self.image_width / 4)
-        lh = int(self.image_height / 4)
+        enable_dump = False
+        if enable_dump:
+            self.dump_roi(pos_x, pos_y)
+            return TrafficLight.UNKNOWN
 
-        cv_y = self.image_height - pos_y
-        top = max(cv_y - lh, 0)
-        bottom = min(cv_y + lh, self.image_height)
+        roi = self.extract_roi(pos_x, pos_y)
 
-        left = max(pos_x - lw, 0)
-        right = min(pos_x + lw, self.image_width)
-
-        # select part of the image
-        cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
-        roi = cv_image[top:bottom,left:right]
-
-        # 
-        self.image_pub.publish(self.bridge.cv2_to_imgmsg(roi, "bgr8"))
+        enable_monitoring = True
+        if enable_monitoring:
+            self.image_pub.publish(self.bridge.cv2_to_imgmsg(roi, "bgr8"))
 
         # Get classification
         state = self.light_classifier.get_classification(roi)
+
         dump_unknown_images = False
         if state == TrafficLight.UNKNOWN and dump_unknown_images:
             t = rospy.Time.now()
@@ -252,6 +258,26 @@ class TLDetector(object):
         rospy.logdebug("state: %s", state)
         return state
 
+
+    def extract_roi(self, pos_x, pos_y):
+        pos_x_min, pos_x_max = fit_box(self.image_width, pos_x, int(self.image_width/2))
+        pos_y_min, pos_y_max = fit_box(self.image_height, pos_y, int(self.image_height/2))
+
+        top = pos_y_min
+        bottom = pos_y_max
+
+        left = pos_x_min
+        right = pos_x_max
+
+        # select part of the image
+        cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
+        return cv_image[top:bottom,left:right]
+
+    def dump_roi(self, pos_x, pos_y):
+        roi = self.extract_roi(pos_x, pos_y)
+        filename = 'img_%s.png' % (self.dump_count)
+        self.dump_count += 1
+        cv2.imwrite(filename, roi)
 
     def load_stop_line_waypoints(self, waypoints):
 

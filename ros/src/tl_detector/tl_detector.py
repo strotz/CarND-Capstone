@@ -6,7 +6,10 @@ from styx_msgs.msg import TrafficLightArray, TrafficLight
 from styx_msgs.msg import Lane
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
+
 from light_classification.tl_classifier import TLClassifier
+import state_filter
+
 import tf
 import cv2
 import yaml
@@ -25,9 +28,6 @@ def fit_box(total, pos, box):
         return total - box, total
 
     return pos - margin, pos + margin
-
-
-STATE_COUNT_THRESHOLD = 3
 
 class TLDetector(object):
     def __init__(self):
@@ -72,10 +72,7 @@ class TLDetector(object):
         self.light_classifier = TLClassifier()
         self.listener = tf.TransformListener()
 
-        self.state = TrafficLight.UNKNOWN
-        self.last_state = TrafficLight.UNKNOWN
-        self.last_wp = -1
-        self.state_count = 0
+        self.state_filter = state_filter.StateFilter()
 
         # to collect pictures
         self.dump_count = 0
@@ -107,24 +104,10 @@ class TLDetector(object):
         self.camera_image = msg
         light_wp, state = self.process_traffic_lights()
 
-        '''
-        Publish upcoming red lights at camera frequency.
-        Each predicted state has to occur `STATE_COUNT_THRESHOLD` number
-        of times till we start using it. Otherwise the previous stable state is
-        used.
-        '''
+        to_send = self.state_filter.append(state, light_wp)
+        if to_send: 
+            self.upcoming_red_light_pub.publish(Int32(to_send))
 
-        if self.state != state:
-            self.state_count = 0
-            self.state = state
-        elif self.state_count >= STATE_COUNT_THRESHOLD:
-            self.last_state = self.state
-            light_wp = light_wp if state == TrafficLight.RED or state == TrafficLight.YELLOW else -1
-            self.last_wp = light_wp
-            self.upcoming_red_light_pub.publish(Int32(light_wp))
-        else:
-            self.upcoming_red_light_pub.publish(Int32(self.last_wp))
-        self.state_count += 1
 
     def get_closest_waypoint(self, pose, waypoints):
         """Identifies the closest path waypoint to the given position

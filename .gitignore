@@ -7,5 +7,7 @@ profile.tmp
 
 .DS_Store
 .idea
-.vscode/.ropeproject/config.py
-ros/src/tl_detector/light_classification/learn/images/*.png
+.vscode/
+
+ros/src/tl_detector/light_classification/learn/images/
+ros/src/tl_detector/light_classification/learn/nets/

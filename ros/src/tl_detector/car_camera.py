@@ -23,8 +23,8 @@ class CarCamera(object):
         pos_x_min, pos_x_max = fit_box(self.image_width, pos_x, int(self.image_width / 2))
         pos_y_min, pos_y_max = fit_box(self.image_height, pos_y, int(self.image_height / 2))
 
-        top = pos_y_min
-        bottom = pos_y_max
+        top = self.image_height - pos_y_max
+        bottom = self.image_height - pos_y_min
 
         left = pos_x_min
         right = pos_x_max
@@ -64,10 +64,12 @@ class CarCamera(object):
 
         camera_z = camera_position.z
         adjustment_for_roll = math.tan(roll) * X
-
         light_z = point_in_world.z
+
+        # rospy.loginfo("camera: %s, light: %s, roll: %s, adjustment: %s", camera_z, light_z, roll, adjustment_for_roll)
+
         pos_y = self.image_height /2 + int(self.fy * (light_z - camera_z - adjustment_for_roll) / X)
-        rospy.logdebug("light coordinates at image: %s, %s", pos_x, pos_y)
+        # rospy.logdebug("light coordinates at image: %s, %s", pos_x, pos_y)
         return (pos_x, pos_y)
 
     def does_it_fit(self, coords):

@@ -47,7 +47,7 @@ class SSDClassifier(object):
         scores = np.squeeze(scores)
         classes = np.squeeze(classes)
 
-        how = 'best'
+        how = 'adjusted'
         if how == 'best':
             return self.class_by_best_score(classes, scores) 
         elif how == 'adjusted':
@@ -70,21 +70,26 @@ class SSDClassifier(object):
 
         box = boxes[index]
         (b, l, t, r) = box
-        (w, h, c) = image.shape
+        h, w, c = image.shape
 
         bottom = int(b*h)
         left = int(l*w)
         top = int(t*h)
         right = int(r*w)
 
-        if top == bottom or left == right:
-            return TrafficLight.UNKNOWN
-
-        # TODO: range is out
+        if bottom < 0:
+            bottom = 0
+        if top > h:
+            top = h
+        if left < 0:
+            left = 0
+        if right > w:
+            right = w
 
         rospy.loginfo("%s %s %s %s", bottom, top, left, right)
         detected_area = image[bottom:top,left:right]
 
-        #z = image[top:bottom,left:right]
+        # TODO: adjust color detection
+
         self.monitor.trace(detected_area)
         return classes[index]

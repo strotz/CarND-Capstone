@@ -5,6 +5,8 @@ import cv2
 import numpy as np
 import os
 
+from camera_monitor import CameraMonitor
+
 class SSDClassifier(object):
     def __init__(self):
         self.graph = self.load_frozen_graph()
@@ -15,6 +17,9 @@ class SSDClassifier(object):
         self.detection_boxes = self.graph.get_tensor_by_name('detection_boxes:0')
         self.detection_scores = self.graph.get_tensor_by_name('detection_scores:0')
         self.detection_classes = self.graph.get_tensor_by_name('detection_classes:0')
+
+        self.monitor = CameraMonitor()
+
         
     def load_frozen_graph(self):
         dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -32,18 +37,21 @@ class SSDClassifier(object):
 
     def get_classification(self, image):
 
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        image_np = np.expand_dims(np.asarray(image, dtype=np.uint8), 0)
+        rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        x = np.asarray(rgb_image, dtype=np.uint8)
+        x = np.expand_dims(x, 0)
         (boxes, scores, classes) = self.sess.run( [self.detection_boxes, self.detection_scores, self.detection_classes], 
-            feed_dict={self.image_tensor: image_np})
+            feed_dict={self.image_tensor: x})
                                             
         boxes = np.squeeze(boxes)
         scores = np.squeeze(scores)
         classes = np.squeeze(classes)
 
-        use_best_score = True
-        if use_best_score:
+        how = 'best'
+        if how == 'best':
             return self.class_by_best_score(classes, scores) 
+        elif how == 'adjusted':
+            return self.object_detection_adjusted(image, classes, scores, boxes)
 
         return TrafficLight.UNKNOWN
 
@@ -52,4 +60,31 @@ class SSDClassifier(object):
             return TrafficLight.UNKNOWN
         
         index = np.argmax(scores)
+        return classes[index]
+
+    def object_detection_adjusted(self, image, classes, scores, boxes):
+        if scores.size <= 0:
+            return TrafficLight.UNKNOWN
+        
+        index = np.argmax(scores)
+
+        box = boxes[index]
+        (b, l, t, r) = box
+        (w, h, c) = image.shape
+
+        bottom = int(b*h)
+        left = int(l*w)
+        top = int(t*h)
+        right = int(r*w)
+
+        if top == bottom or left == right:
+            return TrafficLight.UNKNOWN
+
+        # TODO: range is out
+
+        rospy.loginfo("%s %s %s %s", bottom, top, left, right)
+        detected_area = image[bottom:top,left:right]
+
+        #z = image[top:bottom,left:right]
+        self.monitor.trace(detected_area)
         return classes[index]

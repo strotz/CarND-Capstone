@@ -11,7 +11,7 @@ from light_classification.tl_classifier import TLClassifier
 
 import state_filter
 from car_camera import CarCamera
-from camera_monitor import CameraMonitor
+from light_classification.camera_monitor import CameraMonitor
 
 import tf
 import cv2
@@ -62,10 +62,10 @@ class TLDetector(object):
         self.listener = tf.TransformListener()
 
         self.state_filter = state_filter.StateFilter()
-        self.monitor = CameraMonitor()
+        # self.monitor = CameraMonitor()
 
-        # to collect pictures
-        self.dump_count = 0
+        # True for simulator, False for site
+        self.roi_extraction = False
 
         rospy.spin()
 
@@ -93,7 +93,6 @@ class TLDetector(object):
         """
         light_wp, state = self.process_traffic_lights(msg)
 
-        # to_send = self.state_filter.append(state, light_wp)
         to_send = self.state_filter.bypass(state, light_wp)
         if to_send: 
             self.upcoming_red_light_pub.publish(Int32(to_send))
@@ -171,8 +170,11 @@ class TLDetector(object):
 
         (pos_x, pos_y) = coords            
         cv_image = self.bridge.imgmsg_to_cv2(camera_image, "bgr8")
-        roi = self.camera.extract_roi(cv_image, pos_x, pos_y)
-        self.monitor.trace(roi)
+
+        if self.roi_extraction:
+            roi = self.camera.extract_roi(cv_image, pos_x, pos_y)
+        else:
+            roi = cv_image
 
         # Get classification
         state = self.light_classifier.get_classification(roi)

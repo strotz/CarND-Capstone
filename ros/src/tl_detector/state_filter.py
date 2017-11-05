@@ -30,3 +30,7 @@ class StateFilter(object):
             self.state_count += 1
             return self.last_wp
 
+    def bypass(self, state, light_wp):
+        light_wp = light_wp if state == TrafficLight.RED or state == TrafficLight.YELLOW else -1
+        return light_wp
+        

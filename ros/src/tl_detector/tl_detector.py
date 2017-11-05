@@ -8,8 +8,10 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 
 from light_classification.tl_classifier import TLClassifier
+
 import state_filter
 from car_camera import CarCamera
+from camera_monitor import CameraMonitor
 
 import tf
 import cv2
@@ -60,6 +62,7 @@ class TLDetector(object):
         self.listener = tf.TransformListener()
 
         self.state_filter = state_filter.StateFilter()
+        self.monitor = CameraMonitor()
 
         # to collect pictures
         self.dump_count = 0
@@ -90,7 +93,8 @@ class TLDetector(object):
         """
         light_wp, state = self.process_traffic_lights(msg)
 
-        to_send = self.state_filter.append(state, light_wp)
+        # to_send = self.state_filter.append(state, light_wp)
+        to_send = self.state_filter.bypass(state, light_wp)
         if to_send: 
             self.upcoming_red_light_pub.publish(Int32(to_send))
 
@@ -168,10 +172,7 @@ class TLDetector(object):
         (pos_x, pos_y) = coords            
         cv_image = self.bridge.imgmsg_to_cv2(camera_image, "bgr8")
         roi = self.camera.extract_roi(cv_image, pos_x, pos_y)
-
-        enable_monitoring = True
-        if enable_monitoring:
-            self.image_pub.publish(self.bridge.cv2_to_imgmsg(roi, "bgr8"))
+        self.monitor.trace(roi)
 
         # Get classification
         state = self.light_classifier.get_classification(roi)

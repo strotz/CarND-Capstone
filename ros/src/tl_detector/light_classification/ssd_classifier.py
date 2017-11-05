@@ -35,8 +35,7 @@ class SSDClassifier(object):
                 tf.import_graph_def(graph_def, name='')
         return graph
 
-    def get_classification(self, image):
-
+    def predict(self, image):
         rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         x = np.asarray(rgb_image, dtype=np.uint8)
         x = np.expand_dims(x, 0)
@@ -47,49 +46,14 @@ class SSDClassifier(object):
         scores = np.squeeze(scores)
         classes = np.squeeze(classes)
 
-        how = 'adjusted'
-        if how == 'best':
-            return self.class_by_best_score(classes, scores) 
-        elif how == 'adjusted':
-            return self.object_detection_adjusted(image, classes, scores, boxes)
+        return (boxes, scores, classes)
 
-        return TrafficLight.UNKNOWN
+    def get_classification(self, image):
+        (boxes, scores, classes) = self.predict(image)
 
-    def class_by_best_score(self, classes, scores):
         if scores.size <= 0:
             return TrafficLight.UNKNOWN
         
         index = np.argmax(scores)
         return classes[index]
 
-    def object_detection_adjusted(self, image, classes, scores, boxes):
-        if scores.size <= 0:
-            return TrafficLight.UNKNOWN
-        
-        index = np.argmax(scores)
-
-        box = boxes[index]
-        (b, l, t, r) = box
-        h, w, c = image.shape
-
-        bottom = int(b*h)
-        left = int(l*w)
-        top = int(t*h)
-        right = int(r*w)
-
-        if bottom < 0:
-            bottom = 0
-        if top > h:
-            top = h
-        if left < 0:
-            left = 0
-        if right > w:
-            right = w
-
-        rospy.loginfo("%s %s %s %s", bottom, top, left, right)
-        detected_area = image[bottom:top,left:right]
-
-        # TODO: adjust color detection
-
-        self.monitor.trace(detected_area)
-        return classes[index]

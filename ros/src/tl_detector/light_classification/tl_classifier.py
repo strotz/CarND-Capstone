@@ -5,13 +5,16 @@ from styx_msgs.msg import TrafficLight
 
 import countor_classifier
 import ssd_classifier
+import hybrid_classifier
 
 class TLClassifier(object):
-    def __init__(self, method = 'ssd'):
+    def __init__(self, method = 'hybrid'):
         if method == 'countor':
             self.classifier = countor_classifier.CountorClassifier()
         elif method == 'ssd':
             self.classifier = ssd_classifier.SSDClassifier()
+        elif method == 'hybrid':
+            self.classifier = hybrid_classifier.HybridClassifier()
 
     def get_classification(self, image):
         """Determines the color of the traffic light in the image

@@ -99,10 +99,10 @@ class WaypointUpdater(object):
             SLOW_DISTANCE = 30
             STOP_DISTANCE = 5 
             if distance_to_red_light <= STOP_DISTANCE: 
-                rospy.loginfo("RUN: STOP distance to light %s", distance_to_red_light)
+                rospy.logdebug("RUN: STOP distance to light %s", distance_to_red_light)
                 send = self.build_stop_profile(send)
             elif distance_to_red_light < (SLOW_DISTANCE + MARGIN):
-                rospy.loginfo("RUN: SLOW distance to light %s", distance_to_red_light)                
+                rospy.logdebug("RUN: SLOW distance to light %s", distance_to_red_light)                
                 send = self.build_slowdown_profile(send, distance_to_red_light, SLOW_DISTANCE, STOP_DISTANCE, MAX_SPEED)    
             else:
                 rospy.logdebug("RUN: KEEP distance to light %s", distance_to_red_light)

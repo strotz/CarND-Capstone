@@ -22,7 +22,7 @@ class SSDClassifier(object):
         
     def load_frozen_graph(self):
         dir_path = os.path.dirname(os.path.realpath(__file__))
-        frozen_graph_filename = 'learn/nets/simulated_frozen_inference_graph.pb'
+        frozen_graph_filename = 'simulated_frozen_inference_graph.pb'
         frozen_graph_path = os.path.join(dir_path, frozen_graph_filename)
 
         graph = tf.Graph()

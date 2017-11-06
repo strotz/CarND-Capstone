@@ -35,7 +35,9 @@ v = a * a * MAX_SPEED # x^2
  
 It would be nice to be able to use data from "/current_velocity" in this module. Such data can open posibilities to generate better predictions and exact speed profiles. Yet, site bag does not contain this signal and it limits funtionality of this module.
  
-### Traffic Light Detector (version 1)
+### Traffic Light Detector
+
+#### Contour Classifier
 
 tl_detector.py contains implentation of algorithms which decides if a traffic light is close enough, cuts region of interest (ROI() from the image, calls classifier, and reports upcoming traffic light state.
 
@@ -53,7 +55,7 @@ It has the following methods:
 4) sends ROI for classification;
 5) reports the traffic light state to the caller.
 
-tl_classifier.py contains implementation of traffic light classifier (method get_classification). It uses computer vision library OpenCV to analyze incoming images and decide if there is a traffice ligth and what it's color.
+contour_classifier.py contains implementation of traffic light classifier, which determines the color of the traffic light in the image. It uses computer vision library OpenCV to analyze incoming images and decide if there is a traffice ligth and what it's color.
 
 The algorithm works as following:
 
@@ -70,10 +72,31 @@ The algorithm works as following:
 3) if the bright areas of histogram contain at least 50% green - it is green;
 4) otherwise the color is unknown.
 
-### Traffic Light Detector (version 2)
+#### SSD Classifier
 
+The above-mentioned classifier focuses on finding out what color the traffic lights are. However, in order to classify the color of the traffic light by using the above detector, firstly, it is necessary to know the exact position of the traffic light. Object detection is about deciding where exactly in the image are objects belonging to certain categories such as cars, dogs etc.
 
- 
+A very promising family of object detectors, are deep learning networks that receive an image as an input, run the network on the image, and output a list of detections. Since these networks run through the image only once, they are referred to as “single shot” detectors.
+
+ssd_classifier.py contains a classifier implementation that identifies where the traffic lights are in the image. Using the pre-trained SSD model, we were able to easily find the light of an image.
+
+It has the following methods:
+
+1) Load frozen graph.
+2) Receive an image as an input, run the network on the image, and output a list of detections.
+3) Select the one with the highest score among the detected objects.
+4) Determines the color of the traffic light.
+
+#### Hybrid Classifier
+
+A pre-trained model that we can easily obtain can locate the location of a traffic light, but most of the time it is not possible to distinguish the color of the traffic light. However you can fine tune them on your own data by changing the number of categories in the last layer of the network, possibly removing / adding layers, and retraining on your data. Even if you fine tune them using existing pre-trained networks, requires a lot of data and long training time to get good results.
+
+Since SSD classifier correctly detects locations of traffic light, we decided to implement a hybrid classifier. It is implemented in the hybrid_classifer.py file and works as follows.
+
+1) Detect location of traffic light and it's color.
+2) The color of the traffic light is estimated by applying the contour classifier method to the detected traffic light image.
+3) Select one of the two estimates with a higher score.
+
 ### Twist Controller
 
 twist_controller.py file contains a stub of the Controller class. We implemented the control method to return throttle, brake, and steering values. We have also added a reset method to prevent the PID controller from accumulating errors when the safety driver is taken over.

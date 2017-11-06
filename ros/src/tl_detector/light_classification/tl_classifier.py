@@ -3,14 +3,14 @@ import numpy as np
 import rospy
 from styx_msgs.msg import TrafficLight
 
-import countor_classifier
+import contour_classifier
 import ssd_classifier
 import hybrid_classifier
 
 class TLClassifier(object):
     def __init__(self, method = 'hybrid'):
-        if method == 'countor':
-            self.classifier = countor_classifier.CountorClassifier()
+        if method == 'contour':
+            self.classifier = contour_classifier.ContourClassifier()
         elif method == 'ssd':
             self.classifier = ssd_classifier.SSDClassifier()
         elif method == 'hybrid':

@@ -3,7 +3,7 @@ import numpy as np
 import rospy
 from styx_msgs.msg import TrafficLight
 
-class CountorClassifier(object):
+class ContourClassifier(object):
     def __init__(self):
         pass
 

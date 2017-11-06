@@ -35,7 +35,7 @@ v = a * a * MAX_SPEED # x^2
  
 It would be nice to be able to use data from "/current_velocity" in this module. Such data can open posibilities to generate better predictions and exact speed profiles. Yet, site bag does not contain this signal and it limits funtionality of this module.
  
-### Traffic Light Detector
+### Traffic Light Detector (version 1)
 
 tl_detector.py contains implentation of algorithms which decides if a traffic light is close enough, cuts region of interest (ROI() from the image, calls classifier, and reports upcoming traffic light state.
 
@@ -69,6 +69,10 @@ The algorithm works as following:
 2) if the bright areas of histogram contain at least 50% red - it is red;
 3) if the bright areas of histogram contain at least 50% green - it is green;
 4) otherwise the color is unknown.
+
+### Traffic Light Detector (version 2)
+
+
  
 ### Twist Controller
 

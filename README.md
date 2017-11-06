@@ -76,9 +76,12 @@ The algorithm works as following:
 
 The above-mentioned classifier focuses on finding out what color the traffic lights are. However, in order to classify the color of the traffic light by using the above detector, firstly, it is necessary to know the exact position of the traffic light. Object detection is about deciding where exactly in the image are objects belonging to certain categories such as cars, dogs etc.
 
-A very promising family of object detectors, are deep learning networks that receive an image as an input, run the network on the image, and output a list of detections. Since these networks run through the image only once, they are referred to as “single shot” detectors.
+A very promising family of object detectors, are deep learning networks that receive an image as an input, run the network on the image, and output a list of detections. Since these networks run through the image only once, they are referred to as “single shot” detectors. To build one, we used instructions from 
 
-ssd_classifier.py contains a classifier implementation that identifies where the traffic lights are in the image. Using the pre-trained SSD model, we were able to easily find the light of an image.
+https://medium.com/@WuStangDan/step-by-step-tensorflow-object-detection-api-tutorial-part-1-selecting-a-model-a02b6aabe39e
+https://github.com/tensorflow/models/tree/master/research/object_detection
+
+ssd_classifier.py contains a classifier implementation that identifies where the traffic lights are in the image. Using the frozen pre-trained SSD model, we were able to easily find the light of an image.
 
 It has the following methods:
 
@@ -89,7 +92,7 @@ It has the following methods:
 
 #### Hybrid Classifier
 
-A pre-trained model that we can easily obtain can locate the location of a traffic light, but most of the time it is not possible to distinguish the color of the traffic light. However you can fine tune them on your own data by changing the number of categories in the last layer of the network, possibly removing / adding layers, and retraining on your data. Even if you fine tune them using existing pre-trained networks, requires a lot of data and long training time to get good results.
+A pre-trained model can detect the location of a traffic light and its color, but since it was trained on simulated data, it failed to distinguish the color of the traffic light from provided rosbag. Even if you fine tune them, it requires a lot of data and long training time to get good results.
 
 Since SSD classifier correctly detects locations of traffic light, we decided to implement a hybrid classifier. It is implemented in the hybrid_classifer.py file and works as follows.
 

@@ -93,7 +93,7 @@ class TLDetector(object):
         """
         light_wp, state = self.process_traffic_lights(msg)
 
-        to_send = self.state_filter.bypass(state, light_wp)
+        to_send = self.state_filter.append(state, light_wp)
         if to_send: 
             self.upcoming_red_light_pub.publish(Int32(to_send))
 

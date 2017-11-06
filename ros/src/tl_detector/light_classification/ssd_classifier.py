@@ -18,8 +18,7 @@ class SSDClassifier(object):
         self.detection_scores = self.graph.get_tensor_by_name('detection_scores:0')
         self.detection_classes = self.graph.get_tensor_by_name('detection_classes:0')
 
-        self.monitor = CameraMonitor()
-
+        # self.monitor = CameraMonitor()
         
     def load_frozen_graph(self):
         dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -55,5 +54,15 @@ class SSDClassifier(object):
             return TrafficLight.UNKNOWN
         
         index = np.argmax(scores)
-        return classes[index]
+        return self.class_to_tl(classes[index])
 
+    def class_to_tl(self, input):
+        ii = int(input)
+        if ii == 1:
+            return TrafficLight.RED
+        elif ii == 2:
+            return TrafficLight.YELLOW
+        elif ii == 3:
+            return TrafficLight.GREEN
+        else:
+            return TrafficLight.UNKNOWN
